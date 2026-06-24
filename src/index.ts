@@ -95,6 +95,7 @@ export default function piOpenAgents(pi: ExtensionAPI): void {
     registerSubagentTool(pi, {
       agents: result.agents,
       agentDir: getAgentDir(),
+      getActiveAgent: () => manager.getActive(),
     });
 
     // Check for --agent CLI flag first (highest priority)

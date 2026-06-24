@@ -162,6 +162,8 @@ export interface RegisterSubagentToolOptions {
   run?: typeof runSubagent;
   env?: RecursionEnv;
   agentDir?: string;
+  /** Returns the currently active primary agent, if any. Used for allowedAgents filtering. */
+  getActiveAgent?: () => AgentDefinition | undefined;
 }
 
 /**
@@ -222,6 +224,16 @@ export function registerSubagentTool(
         throw new Error(
           `Unknown agent: ${params.agent}. Available agents: ${availableAgentsText(agents)}.`,
         );
+      }
+
+      // Check active agent's allowedAgents whitelist
+      const activeAgent = options.getActiveAgent?.();
+      if (activeAgent?.allowedAgents && activeAgent.allowedAgents.length > 0) {
+        if (!activeAgent.allowedAgents.includes(agent.name)) {
+          throw new Error(
+            `Agent "${activeAgent.name}" can only delegate to: ${activeAgent.allowedAgents.join(", ")}. "${agent.name}" is not in the list.`,
+          );
+        }
       }
 
       const childCwd = params.cwd ?? ctx.cwd;
