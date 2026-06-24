@@ -26,7 +26,7 @@ import { updateBanner } from "./tui/banner.ts";
 import { registerTuiControls } from "./tui/selector.ts";
 import { registerAgentTools } from "./tui/tools.ts";
 import { registerSubagentTool } from "./subagent/tool.ts";
-import { allowedAgentNames } from "./subagent/env.ts";
+import { allowedAgentNames, isSubagentProcess } from "./subagent/env.ts";
 
 // ─── Settings ────────────────────────────────────────────────────────────────
 
@@ -98,6 +98,14 @@ export default function piOpenAgents(pi: ExtensionAPI): void {
       getActiveAgent: () => manager.getActive(),
     });
 
+    // Subagent child processes are fully configured by the executor via CLI flags
+    // (--model, --system-prompt, --tools). Do NOT apply defaultAgent — it would
+    // override the executor's model/tools/prompt settings.
+    if (isSubagentProcess(process.env)) {
+      updateBanner(ctx.ui, undefined, 0);
+      return;
+    }
+
     // Check for --agent CLI flag first (highest priority)
     const agentFlag = pi.getFlag("agent");
     if (typeof agentFlag === "string" && agentFlag) {
@@ -144,6 +152,10 @@ export default function piOpenAgents(pi: ExtensionAPI): void {
   // ── Before Agent Start: Inject system prompt + subagent guidance ─────────
 
   pi.on("before_agent_start", async (event) => {
+    // Skip system prompt modification in subagent child processes
+    // (executor sets system prompt via --system-prompt CLI flag)
+    if (isSubagentProcess(process.env)) return;
+
     const active = manager.getActive();
     let prompt = event.systemPrompt;
 
