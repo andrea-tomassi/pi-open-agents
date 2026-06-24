@@ -1,0 +1,17 @@
+# Reference repos (cloned for study, not part of our source)
+reference/
+
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
