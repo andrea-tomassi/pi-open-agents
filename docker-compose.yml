@@ -7,8 +7,9 @@ services:
       # Hot-reload: mount src/ over the copied source
       - ./src:/root/pi-open-agents/src
       # Auth + models from host (read-only)
-      - /home/j3st3r/.pi/agent/auth.json:/root/.pi/agent/auth.json:ro
-      - /home/j3st3r/.pi/agent/models.json:/root/.pi/agent/models.json:ro
+      # Override with: PI_AGENT_DIR=/path/to/.pi/agent docker compose run ...
+      - ${PI_AGENT_DIR:-${HOME}/.pi/agent}/auth.json:/root/.pi/agent/auth.json:ro
+      - ${PI_AGENT_DIR:-${HOME}/.pi/agent}/models.json:/root/.pi/agent/models.json:ro
       # Test workspace (project agents, OC agents, shared agents)
       - ./docker/test-workspace:/workspace
     working_dir: /workspace
