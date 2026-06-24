@@ -28,6 +28,77 @@ definitions — so your agents work in **both** pi and OpenCode without modifica
 | OpenCode `.agent.md` format | ❌ | ❌ | ✅ |
 | One plugin for everything | ❌ | ❌ | ✅ |
 
+## Known issues with separate extensions
+
+Before `pi-open-agents`, agent management in pi required two separate plugins:
+`pi-agent-mode` (primary agents) and `@johnnywu/pi-subagents` (subagent delegation).
+Using them together causes several problems that are **impossible to fix without
+a unified plugin**:
+
+### Model override conflicts
+
+`pi-agent-mode` reads `defaultAgent` from `settings.json` and applies the primary
+agent's model globally — including to subagents spawned by `pi-subagents`.
+
+This breaks multi-provider setups where different agents need different models
+(e.g., orchestrator on a strong reasoning model, subagents on a fast local model).
+
+**Symptoms**: Subagents ignore their `model:` frontmatter and use the primary
+agent's model. Workarounds like `defaultModel: "_none_"` or removing
+`defaultAgent` entirely become necessary.
+
+**`pi-open-agents` fixes this**: Each agent's `model:` frontmatter is respected
+independently. No global model override.
+
+### Thinking level defaults to `off`
+
+`pi-subagents` hardcodes subagent thinking to `off`, ignoring
+`defaultThinkingLevel` from `settings.json`. There is no way to configure
+per-agent thinking levels.
+
+**`pi-open-agents` fixes this**: Subagents inherit `defaultThinkingLevel` from
+`settings.json` by default, and can override per-agent via the `thinking:`
+frontmatter field.
+
+### Incompatible frontmatter schemas
+
+The two plugins use different frontmatter field names for the same concepts,
+and both ignore fields they don't recognize:
+
+| Concept | `pi-agent-mode` | `pi-subagents` | `pi-open-agents` |
+|---------|-----------------|---------------|------------------|
+| Thinking level | `reasoningEffort` *(ignored)* | Not supported | `thinking` |
+| Tool restrictions | `tools` (CSV) | `tools` (CSV) | `permission` (rules) + `tools` (CSV) |
+| Agent visibility | `mode` *(ignored)* | Not supported | `mode: primary\|subagent\|all` |
+| Prompt injection | Not configurable | `systemPrompt` | `systemPrompt: append\|replace\|replace-all` |
+| Model override | Global (all agents) | Per-agent | Per-agent |
+
+**`pi-open-agents` fixes this**: One unified schema with all fields working
+together. Backward compatible — existing fields (`tools`, `reasoningEffort`)
+are normalized at parse time.
+
+### No permission system
+
+Neither plugin supports OpenCode-style permission rules. Tool restriction is
+limited to a simple CSV whitelist (`tools: bash, read`) with no pattern matching,
+no deny rules, and no per-file restrictions.
+
+**`pi-open-agents` fixes this**: Full OpenCode permission system with
+`allow`/`deny`/`ask` actions, glob patterns (`*.env`, `**/*.key`), and
+last-match-wins evaluation.
+
+### Migration impact
+
+Real-world deployments using both plugins together have required workarounds
+such as:
+
+- Removing `defaultAgent` from `settings.json` and using `--agent` CLI flag instead
+- Setting `defaultModel` to a sentinel value (`"_none_"`) to prevent global override
+- Using context-based model IDs to force provider isolation
+- Multiple rapid commits to diagnose model routing failures
+
+All of these workarounds become unnecessary with `pi-open-agents`.
+
 ## Who is this for?
 
 - **Pi users** frustrated with managing two plugins for agent switching and delegation
