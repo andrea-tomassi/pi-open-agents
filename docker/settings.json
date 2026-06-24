@@ -1,0 +1,16 @@
+{
+  "lastChangelogVersion": "0.80.1",
+  "defaultProvider": "opencode-go",
+  "defaultModel": "deepseek-v4-flash",
+  "defaultThinkingLevel": "high",
+  "enabledModels": [
+    "opencode-go/deepseek-v4-flash",
+    "opencode-go/deepseek-v4-pro",
+    "zai/glm-5.2"
+  ],
+  "theme": "dark",
+  "packages": [
+    "../../pi-open-agents"
+  ],
+  "enableSkillCommands": false
+}

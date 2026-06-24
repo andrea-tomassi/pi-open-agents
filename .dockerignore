@@ -1,0 +1,21 @@
+# Dependencies
+node_modules/
+package-lock.json
+
+# Reference repos (159M+, not needed in container)
+reference/
+
+# Docker artifacts
+docker/test-workspace/.pi/sessions/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git
+.git
