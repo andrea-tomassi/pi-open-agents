@@ -61,6 +61,14 @@ function loadSettings(cwd: string): Settings {
 export default function piOpenAgents(pi: ExtensionAPI): void {
   const manager = new AgentManager();
 
+  // ── Register CLI flag immediately (before session_start) ──────────────────
+  // Extension flags are parsed during startup, before session_start fires.
+  // Must register here, not inside session_start.
+  pi.registerFlag("agent", {
+    description: "Default agent to use at startup",
+    type: "string",
+  });
+
   // ── Session Start: Load agents and apply default ───────────────────────────
 
   pi.on("session_start", async (event, ctx) => {

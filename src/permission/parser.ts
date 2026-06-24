@@ -21,6 +21,7 @@
  */
 
 import type { PermissionConfig, PermissionRule } from "../types.ts";
+import { toolToPermission } from "./evaluator.ts";
 
 /**
  * Flatten a PermissionConfig into ordered PermissionRule[].
@@ -28,16 +29,22 @@ import type { PermissionConfig, PermissionRule } from "../types.ts";
  * Rules from nested objects are expanded with their pattern.
  * Simple string values get pattern "*".
  *
+ * Permission keys are normalized via toolToPermission (write → edit, etc.)
+ * so that both "write: deny" and "edit: deny" affect the edit tool.
+ *
  * Order is preserved as written (object key order).
  */
 export function parsePermissionRules(config: PermissionConfig): PermissionRule[] {
   const rules: PermissionRule[] = [];
 
   for (const [permission, value] of Object.entries(config)) {
+    // Normalize tool name to permission category (write -> edit, etc.)
+    const normalizedPerm = toolToPermission(permission);
+
     if (typeof value === "string") {
-      // Simple form: bash: allow → { permission: "bash", pattern: "*", action: "allow" }
+      // Simple form: bash: allow
       rules.push({
-        permission,
+        permission: normalizedPerm,
         pattern: "*",
         action: value,
       });
@@ -46,7 +53,7 @@ export function parsePermissionRules(config: PermissionConfig): PermissionRule[]
       for (const [pattern, action] of Object.entries(value)) {
         if (typeof action === "string") {
           rules.push({
-            permission,
+            permission: normalizedPerm,
             pattern,
             action,
           });

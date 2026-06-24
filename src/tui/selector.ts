@@ -250,12 +250,6 @@ export async function showSearchResults(
  * Register all TUI commands, shortcuts, and CLI flags.
  */
 export function registerTuiControls(manager: AgentManager, pi: ExtensionAPI): void {
-  // CLI flag
-  pi.registerFlag("agent", {
-    description: "Default agent to use at startup",
-    type: "string",
-  });
-
   // Ctrl+Shift+M: Cycle agents
   pi.registerShortcut(Key.ctrlShift("m"), {
     description: "Cycle agents",
