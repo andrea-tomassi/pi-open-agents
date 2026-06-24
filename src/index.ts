@@ -21,12 +21,12 @@ import { getAgentDir } from "@earendil-works/pi-coding-agent";
 import type { AgentDefinition, ThinkingLevel } from "./types.ts";
 import { loadAgents, selectableAgents, spawnableAgents } from "./discovery/loader.ts";
 import { AgentManager } from "./primary/manager.ts";
-import { refreshAgentTools, buildSystemPrompt } from "./primary/executor.ts";
+import { refreshAgentTools, buildSystemPrompt, buildSubagentGuidance } from "./primary/executor.ts";
 import { updateBanner } from "./tui/banner.ts";
 import { registerTuiControls } from "./tui/selector.ts";
 import { registerAgentTools } from "./tui/tools.ts";
 import { registerSubagentTool } from "./subagent/tool.ts";
-import { isSubagentReplaceSystemPrompt } from "./subagent/env.ts";
+import { allowedAgentNames } from "./subagent/env.ts";
 
 // ─── Settings ────────────────────────────────────────────────────────────────
 
@@ -141,33 +141,40 @@ export default function piOpenAgents(pi: ExtensionAPI): void {
     updateBanner(ctx.ui, manager.getActive(), selectableAgents(manager.getAgents()).length);
   });
 
-  // ── Before Agent Start: Inject system prompt + refresh tools ───────────────
+  // ── Before Agent Start: Inject system prompt + subagent guidance ─────────
 
   pi.on("before_agent_start", async (event) => {
     const active = manager.getActive();
-    if (!active) return;
+    let prompt = event.systemPrompt;
 
-    // Re-evaluate tool set (catches async-registered tools like MCP)
-    refreshAgentTools(active, pi);
-
-    // Inject system prompt
-    const modifiedPrompt = buildSystemPrompt(active, event.systemPrompt);
-    if (modifiedPrompt) {
-      return { systemPrompt: modifiedPrompt };
+    // Primary agent: apply system prompt mode + refresh tools
+    if (active) {
+      refreshAgentTools(active, pi);
+      const modified = buildSystemPrompt(active, prompt);
+      if (modified !== undefined) prompt = modified;
     }
-  });
 
-  // ── Before Agent Start (subagent replace mode): Inject available subagents ─
+    // Inject subagent delegation guidance (if subagent tool is available)
+    const hasSubagentTool = pi.getAllTools().some((t) => t.name === "subagent");
+    if (hasSubagentTool) {
+      // Determine allowed agents: from active agent config or env vars (subagent process)
+      let allowedAgents: string[] | undefined;
+      if (active?.allowedAgents && active.allowedAgents.length > 0) {
+        allowedAgents = active.allowedAgents;
+      } else {
+        const envAllowed = allowedAgentNames(process.env);
+        if (envAllowed) allowedAgents = [...envAllowed];
+      }
 
-  pi.on("before_agent_start", async (event) => {
-    if (!isSubagentReplaceSystemPrompt(process.env)) return;
-    // In replace mode, append available subagent list to the system prompt
-    const agents = manager.getAgents();
-    const spawnable = spawnableAgents(agents);
-    if (spawnable.length === 0) return;
-    const names = spawnable.map((a: AgentDefinition) => a.name).sort().join(", ");
-    const block = `\n\nAvailable subagents:\n- ${names.split(", ").join("\n- ")}`;
-    return { systemPrompt: event.systemPrompt + block };
+      const guidance = buildSubagentGuidance(manager.getAgents(), allowedAgents);
+      if (guidance) {
+        prompt += guidance;
+      }
+    }
+
+    if (prompt !== event.systemPrompt) {
+      return { systemPrompt: prompt };
+    }
   });
 
   // ── Turn Start: Persist agent state (only on change) ───────────────────────

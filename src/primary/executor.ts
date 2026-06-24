@@ -13,6 +13,7 @@ import type { Model } from "@earendil-works/pi-ai";
 import type { AgentDefinition, ModelRef, PermissionRule } from "../types.ts";
 import { parsePermissionRules } from "../permission/parser.ts";
 import { getDisabledTools } from "../permission/evaluator.ts";
+import { spawnableAgents } from "../discovery/loader.ts";
 
 // ─── Model Resolution ────────────────────────────────────────────────────────
 
@@ -138,6 +139,41 @@ export async function applyAgentConfig(
  */
 export function refreshAgentTools(agent: AgentDefinition, pi: ExtensionAPI): void {
   applyTools(agent, pi);
+}
+
+/**
+ * Build subagent delegation guidance to inject into the system prompt.
+ *
+ * Teaches the model HOW to delegate — specifically that subagent names
+ * are NOT CLI commands and must be invoked via the `subagent` tool.
+ * This is injected automatically, so agent authors don't need to explain
+ * the delegation mechanism in their prompts.
+ *
+ * Works for both primary agents and subagent child processes.
+ */
+export function buildSubagentGuidance(
+  agents: AgentDefinition[],
+  allowedAgents?: string[],
+): string | undefined {
+  const allSpawnable = spawnableAgents(agents);
+
+  // Filter by allowedAgents whitelist if specified
+  let available: AgentDefinition[];
+  if (allowedAgents && allowedAgents.length > 0) {
+    const allowed = new Set(allowedAgents);
+    available = allSpawnable.filter((a) => allowed.has(a.name));
+  } else {
+    available = allSpawnable;
+  }
+
+  if (available.length === 0) return undefined;
+
+  const list = available
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .map((a) => `- ${a.name}: ${a.description ?? "Subagent for delegated tasks."}`)
+    .join("\n");
+
+  return `\n\n## Subagent Delegation\n\nYou have ${available.length} subagent(s) available. Delegate isolated tasks using the \`subagent\` tool:\n\nsubagent({ agent: "<name>", task: "<task description>" })\n\nAvailable subagents:\n${list}\n\nIMPORTANT: Subagent names are NOT bash commands. Always use the \`subagent\` tool to delegate — never write scripts that call agent names as CLI commands.`;
 }
 
 /**
