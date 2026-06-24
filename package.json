@@ -1,0 +1,54 @@
+{
+  "name": "pi-open-agents",
+  "version": "0.1.0",
+  "description": "Unified agent and subagent management for pi coding agent, with OpenCode-compatible agent definitions.",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "extension",
+    "agents",
+    "subagents",
+    "opencode"
+  ],
+  "author": "Andrea Tomassi",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/andrea-tomassi/pi-open-agents.git"
+  },
+  "bugs": {
+    "url": "https://github.com/andrea-tomassi/pi-open-agents/issues"
+  },
+  "homepage": "https://github.com/andrea-tomassi/pi-open-agents#readme",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "files": [
+    "src/",
+    "README.md",
+    "LICENSE",
+    "ATTRIBUTION.md"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "node --test --import tsx test/**/*.test.ts"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-ai": "*",
+    "@earendil-works/pi-coding-agent": "*",
+    "@earendil-works/pi-tui": "*",
+    "typebox": "*"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}
