@@ -1,6 +1,6 @@
 {
   "name": "pi-open-agents",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Unified agent and subagent management for pi coding agent, with OpenCode-compatible agent definitions.",
   "keywords": [
     "pi-package",
@@ -48,10 +48,18 @@
     "typebox": "*"
   },
   "peerDependenciesMeta": {
-    "@earendil-works/pi-ai": { "optional": true },
-    "@earendil-works/pi-coding-agent": { "optional": true },
-    "@earendil-works/pi-tui": { "optional": true },
-    "typebox": { "optional": true }
+    "@earendil-works/pi-ai": {
+      "optional": true
+    },
+    "@earendil-works/pi-coding-agent": {
+      "optional": true
+    },
+    "@earendil-works/pi-tui": {
+      "optional": true
+    },
+    "typebox": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
