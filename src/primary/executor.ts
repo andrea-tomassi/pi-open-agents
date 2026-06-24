@@ -38,7 +38,14 @@ async function applyModel(agent: AgentDefinition, pi: ExtensionAPI, ctx: Extensi
   if (!ref) return;
 
   const model = ctx.modelRegistry.find(ref.provider, ref.modelId);
-  if (!model) return;
+  if (!model) {
+    const available = ctx.modelRegistry.getAvailable().map((m: Model<any>) => `${m.provider}/${m.id}`).join(", ");
+    ctx.ui.notify(
+      `Agent "${agent.name}": Model ${ref.provider}/${ref.modelId} not found in registry. Available: ${available}`,
+      "warning",
+    );
+    return;
+  }
 
   const success = await pi.setModel(model);
   if (!success) {
@@ -151,11 +158,8 @@ export function buildSystemPrompt(
       return `${agent.prompt}\n\n${currentPrompt}`;
 
     case "replace":
-      // Replace the provider prompt but keep context files
-      // In inline mode, we can only append — full replace requires
-      // the subprocess executor (subagent path)
-      // For primary agents, "replace" behaves like append for now
-      return `${agent.prompt}\n\n${currentPrompt}`;
+      // Replace the provider/system prompt entirely with the agent body
+      return agent.prompt;
 
     case "replace-all":
       // Full replacement — only agent body
