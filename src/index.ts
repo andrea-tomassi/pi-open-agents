@@ -19,12 +19,14 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
 
 import type { AgentDefinition, ThinkingLevel } from "./types.ts";
-import { loadAgents, selectableAgents } from "./discovery/loader.ts";
+import { loadAgents, selectableAgents, spawnableAgents } from "./discovery/loader.ts";
 import { AgentManager } from "./primary/manager.ts";
 import { refreshAgentTools, buildSystemPrompt } from "./primary/executor.ts";
 import { updateBanner } from "./tui/banner.ts";
 import { registerTuiControls } from "./tui/selector.ts";
 import { registerAgentTools } from "./tui/tools.ts";
+import { registerSubagentTool } from "./subagent/tool.ts";
+import { isSubagentReplaceSystemPrompt } from "./subagent/env.ts";
 
 // ─── Settings ────────────────────────────────────────────────────────────────
 
@@ -79,9 +81,13 @@ export default function piOpenAgents(pi: ExtensionAPI): void {
 
     manager.setAgents(result.agents);
 
-    // Register TUI controls + tools (now that agents are loaded)
+    // Register TUI controls + tools + subagent tool
     registerTuiControls(manager, pi);
     registerAgentTools(manager, pi);
+    registerSubagentTool(pi, {
+      agents: result.agents,
+      agentDir: getAgentDir(),
+    });
 
     // Check for --agent CLI flag first (highest priority)
     const agentFlag = pi.getFlag("agent");
@@ -142,6 +148,19 @@ export default function piOpenAgents(pi: ExtensionAPI): void {
     }
   });
 
+  // ── Before Agent Start (subagent replace mode): Inject available subagents ─
+
+  pi.on("before_agent_start", async (event) => {
+    if (!isSubagentReplaceSystemPrompt(process.env)) return;
+    // In replace mode, append available subagent list to the system prompt
+    const agents = manager.getAgents();
+    const spawnable = spawnableAgents(agents);
+    if (spawnable.length === 0) return;
+    const names = spawnable.map((a: AgentDefinition) => a.name).sort().join(", ");
+    const block = `\n\nAvailable subagents:\n- ${names.split(", ").join("\n- ")}`;
+    return { systemPrompt: event.systemPrompt + block };
+  });
+
   // ── Turn Start: Persist agent state (only on change) ───────────────────────
 
   pi.on("turn_start", async () => {
@@ -166,3 +185,11 @@ export type { LoadAgentsOptions } from "./discovery/loader.ts";
 export { parsePermissionRules, mergePermissionConfigs } from "./permission/parser.ts";
 export { matchPattern, isWildcardPattern } from "./permission/matcher.ts";
 export { evaluate, toolToPermission, getDisabledTools, filterDisabledTools } from "./permission/evaluator.ts";
+
+// Subagent re-exports
+export { runSubagent, resolveSubagentSession, resolvePiEntryPoint } from "./subagent/executor.ts";
+export type { AgentProgress, AgentResult, RunSubagentOptions, SubagentSessionInfo, SubagentSessionMode } from "./subagent/executor.ts";
+export { resolveSkills } from "./subagent/skills.ts";
+export type { ResolvedSkill } from "./subagent/skills.ts";
+export { buildSubagentPrompt } from "./subagent/prompt.ts";
+export { formatResultLines, formatUsage } from "./subagent/render.ts";
