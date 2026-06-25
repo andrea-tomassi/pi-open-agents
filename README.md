@@ -132,6 +132,7 @@ That's it. Existing `.agent.md` files work without changes (default `mode: all`)
 - **Permission system** — OpenCode-style `allow`/`deny`/`ask` with glob patterns, last-match-wins
 - **Thinking level per-agent** — `off`/`minimal`/`low`/`medium`/`high`/`xhigh`, with fallback to `settings.json`
 - **Subagent execution** — child pi process spawning with scoped tools, skills, and session fork
+- **Auto-injected delegation guidance** — the plugin automatically teaches the model how to use the `subagent` tool, including the list of available agents and the correct call syntax. No need to explain delegation mechanics in agent prompts.
 - **Skill loading** — per-agent skills with wildcard support (`lark-*`, `github`)
 
 ## Agent definition format
@@ -176,12 +177,24 @@ field controls how it interacts with pi's default system prompt:
 | Mode | Behavior |
 |------|----------|
 | `append` (default) | Agent body is prepended to pi's system prompt |
-| `replace` | Agent body replaces pi's prompt (primary agents: same as `append` in inline mode) |
+| `replace` | Agent body replaces pi's system prompt entirely |
 | `replace-all` | Only the agent body is used — pi's prompt is discarded entirely |
 
 For **subagents** (child process), the agent body **is** the system prompt — pi's default
 prompt is not included. If the agent has `skills:`, they are injected as an XML block
 after the body.
+
+### Auto-injected subagent guidance
+
+If an agent has the `subagent` tool available, the plugin automatically appends a
+`## Subagent Delegation` section to the system prompt. This section:
+
+- Lists all available subagents (name + description), filtered by `allowedAgents`
+- Shows the correct call syntax: `subagent({ agent: "<name>", task: "<task>" })`
+- Warns that subagent names are **not** CLI commands
+
+This means agent authors **never** need to explain delegation mechanics in their prompts.
+The plugin handles it, just like pi handles tool descriptions.
 
 ## Discovery paths
 
