@@ -170,13 +170,17 @@ Your prompt goes here. This becomes the agent's system prompt.
 ### System prompt modes
 
 The `systemPrompt` field controls how the agent body interacts with pi's default
-prompt:
+prompt and workspace context files (CLAUDE.md, etc.):
 
-| Mode | Behavior |
-|------|----------|
-| `append` (default) | Agent body prepended to pi's system prompt |
-| `replace` | Agent body **replaces** pi's system prompt entirely |
-| `replace-all` | Only agent body — pi's prompt discarded entirely |
+| Mode | System prompt | Context files |
+|------|---------------|---------------|
+| `append` (default) | pi's prompt + agent body | ✅ loaded |
+| `replace` | Agent body only | ✅ loaded |
+| `replace-all` | Agent body only | ❌ disabled |
+
+Use `replace-all` for fully isolated agents that should not be influenced by
+workspace context — e.g., a subagent that must run identically regardless of
+the project it's invoked from.
 
 For **subagents** (child process), the agent body **is** the system prompt —
 pi's default prompt is not included. Skills are injected as an XML block after
