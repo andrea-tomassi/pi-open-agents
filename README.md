@@ -8,6 +8,8 @@ Unified agent and subagent management for [pi](https://pi.dev), with [OpenCode](
 
 Replaces `pi-agent-mode` + `@johnnywu/pi-subagents` with one coherent plugin.
 
+> **Why pi?** Pi's minimalist core keeps system prompts under 1,000 tokens — making it exceptionally fast on local models and cheap on cloud APIs. pi-open-agents is built to leverage that minimalism. See [Pi vs OpenCode: Performance & Architecture](./PI-VS-OPencode.md) for a detailed comparison.
+
 ---
 
 ## Quick start
