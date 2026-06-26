@@ -1,7 +1,7 @@
 # pi-open-agents
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/andrea-tomassi/pi-open-agents/refs/heads/main/pi-open-agents-banner.png" alt="pi-open-agents" width="640">
+  <img src="https://raw.githubusercontent.com/andrea-tomassi/pi-open-agents/refs/heads/main/pi-open-agents-banner.png" alt="pi-open-agents" width="768">
 </p>
 
 [![npm version](https://img.shields.io/npm/v/pi-open-agents.svg)](https://www.npmjs.com/package/pi-open-agents)
