@@ -6,105 +6,9 @@
 
 Unified agent and subagent management for [pi](https://pi.dev), with [OpenCode](https://github.com/sst/opencode)-compatible agent definitions.
 
-Replaces `pi-agent-mode` and `@johnnywu/pi-subagents` with a single, coherent plugin.
+Replaces `pi-agent-mode` + `@johnnywu/pi-subagents` with one coherent plugin.
 
 ---
-
-## Why
-
-Pi delegates agent management to two separate npm plugins that use incompatible
-frontmatter schemas, divergent defaults, and fragmented semantics. This plugin
-replaces both with one unified system that also reads OpenCode-format agent
-definitions — so your agents work in **both** pi and OpenCode without modification.
-
-### Comparison
-
-| Feature | `pi-agent-mode` | `@johnnywu/pi-subagents` | `pi-open-agents` |
-|---------|-----------------|--------------------------|------------------|
-| Primary agent switching | ✅ | ❌ | ✅ |
-| Subagent delegation | ❌ | ✅ | ✅ |
-| Per-agent thinking level | ❌ *(broken)* | ❌ *(defaults to `off`)* | ✅ |
-| OpenCode permission system | ❌ | ❌ | ✅ |
-| OpenCode `.agent.md` format | ❌ | ❌ | ✅ |
-| One plugin for everything | ❌ | ❌ | ✅ |
-
-## Known issues with separate extensions
-
-Before `pi-open-agents`, agent management in pi required two separate plugins:
-`pi-agent-mode` (primary agents) and `@johnnywu/pi-subagents` (subagent delegation).
-Using them together causes several problems that are **impossible to fix without
-a unified plugin**:
-
-### Model override conflicts
-
-`pi-agent-mode` reads `defaultAgent` from `settings.json` and applies the primary
-agent's model globally — including to subagents spawned by `pi-subagents`.
-
-This breaks multi-provider setups where different agents need different models
-(e.g., orchestrator on a strong reasoning model, subagents on a fast local model).
-
-**Symptoms**: Subagents ignore their `model:` frontmatter and use the primary
-agent's model. Workarounds like `defaultModel: "_none_"` or removing
-`defaultAgent` entirely become necessary.
-
-**`pi-open-agents` fixes this**: Each agent's `model:` frontmatter is respected
-independently. No global model override.
-
-### Thinking level defaults to `off`
-
-`pi-subagents` hardcodes subagent thinking to `off`, ignoring
-`defaultThinkingLevel` from `settings.json`. There is no way to configure
-per-agent thinking levels.
-
-**`pi-open-agents` fixes this**: Subagents inherit `defaultThinkingLevel` from
-`settings.json` by default, and can override per-agent via the `thinking:`
-frontmatter field.
-
-### Incompatible frontmatter schemas
-
-The two plugins use different frontmatter field names for the same concepts,
-and both ignore fields they don't recognize:
-
-| Concept | `pi-agent-mode` | `pi-subagents` | `pi-open-agents` |
-|---------|-----------------|---------------|------------------|
-| Thinking level | `reasoningEffort` *(ignored)* | Not supported | `thinking` |
-| Tool restrictions | `tools` (CSV) | `tools` (CSV) | `permission` (rules) + `tools` (CSV) |
-| Agent visibility | `mode` *(ignored)* | Not supported | `mode: primary\|subagent\|all` |
-| Prompt injection | Not configurable | `systemPrompt` | `systemPrompt: append\|replace\|replace-all` |
-| Model override | Global (all agents) | Per-agent | Per-agent |
-
-**`pi-open-agents` fixes this**: One unified schema with all fields working
-together. Backward compatible — existing fields (`tools`, `reasoningEffort`)
-are normalized at parse time.
-
-### No permission system
-
-Neither plugin supports OpenCode-style permission rules. Tool restriction is
-limited to a simple CSV whitelist (`tools: bash, read`) with no pattern matching,
-no deny rules, and no per-file restrictions.
-
-**`pi-open-agents` fixes this**: Full OpenCode permission system with
-`allow`/`deny`/`ask` actions, glob patterns (`*.env`, `**/*.key`), and
-last-match-wins evaluation.
-
-### Migration impact
-
-Real-world deployments using both plugins together have required workarounds
-such as:
-
-- Removing `defaultAgent` from `settings.json` and using `--agent` CLI flag instead
-- Setting `defaultModel` to a sentinel value (`"_none_"`) to prevent global override
-- Using context-based model IDs to force provider isolation
-- Multiple rapid commits to diagnose model routing failures
-
-All of these workarounds become unnecessary with `pi-open-agents`.
-
-## Who is this for?
-
-- **Pi users** frustrated with managing two plugins for agent switching and delegation
-- **OpenCode users** who want to try pi without rewriting their agent definitions
-- **Teams** who want a portable, version-controlled agent library that works across harnesses
-- **Anyone** who wants per-agent thinking levels, permission rules, or model overrides in pi
 
 ## Quick start
 
@@ -112,89 +16,173 @@ All of these workarounds become unnecessary with `pi-open-agents`.
 pi install pi-open-agents
 ```
 
-Remove the old plugins from `~/.pi/agent/settings.json`:
+Remove old plugins from `~/.pi/agent/settings.json`:
 
 ```json
 {
-  "packages": [
-    "npm:pi-open-agents"
-  ]
+  "packages": ["npm:pi-open-agents"]
 }
 ```
 
-That's it. Existing `.agent.md` files work without changes (default `mode: all`).
+Existing `.agent.md` files work without changes (default `mode: all`).
+
+---
+
+## Why this exists
+
+Pi splits agent management across two separate plugins — one for primary agents,
+one for subagents. They use incompatible schemas, conflict on model routing, and
+have no permission system. `pi-open-agents` replaces both:
+
+| | `pi-agent-mode` | `pi-subagents` | `pi-open-agents` |
+|---|---|---|---|
+| Primary agent switching | ✅ | ❌ | ✅ |
+| Subagent delegation | ❌ | ✅ | ✅ |
+| Per-agent thinking level | ❌ | ❌ | ✅ |
+| Permission system | ❌ | ❌ | ✅ |
+| OpenCode `.agent.md` format | ❌ | ❌ | ✅ |
+
+---
 
 ## Features
 
-- **Unified agent definitions** — one `.md` format, superset of OpenCode + pi
-- **Mode-based visibility** — `primary` in the TUI selector, `subagent` for delegation, `all` for both
-- **OpenCode-compatible** — reads agents from `.opencode/agent/`, `.opencode/mode/`, and `.agents/`
-- **Permission system** — OpenCode-style `allow`/`deny`/`ask` with glob patterns, last-match-wins
-- **Thinking level per-agent** — `off`/`minimal`/`low`/`medium`/`high`/`xhigh`, with fallback to `settings.json`
-- **Subagent execution** — child pi process spawning with scoped tools, skills, and session fork
-- **Auto-injected delegation guidance** — the plugin automatically teaches the model how to use the `subagent` tool, including the list of available agents and the correct call syntax. No need to explain delegation mechanics in agent prompts.
-- **Skill loading** — per-agent skills with wildcard support (`lark-*`, `github`)
+### Per-agent model, thinking, and permissions
+
+Every agent defines its own `model:`, `thinking:`, and `permission:` — no global
+overrides, no sentinel values, no workarounds. An orchestrator can run on a strong
+reasoning model while subagents run on a fast local model:
+
+```yaml
+---
+name: orchestrator
+mode: primary
+model: anthropic/claude-sonnet
+thinking: high
+---
+```
+
+```yaml
+---
+name: fast-worker
+mode: subagent
+model: lm-studio/qwen-2.5-coder
+thinking: off
+---
+```
+
+### Permission system
+
+Go beyond a simple tool whitelist. OpenCode-style rules with glob patterns, deny
+rules, and per-action restrictions:
+
+```yaml
+permission:
+  "*": allow              # default: everything allowed
+  "edit": deny            # read-only agent
+  "bash":
+    "git *": allow        # only git commands
+    "rm *": deny          # never delete
+  "subagent": deny        # no delegation
+```
+
+Tool names are normalized automatically: `write` → `edit`, `task` → `subagent`,
+`vscode` → `read`.
+
+### Auto-injected delegation guidance
+
+If an agent has the `subagent` tool, the plugin automatically appends a
+`## Subagent Delegation` block to its system prompt — listing available
+subagents and the correct call syntax:
+
+```
+subagent({ agent: "<name>", task: "<task>" })
+```
+
+You never need to explain delegation mechanics in agent prompts. The plugin
+handles it, the same way pi handles tool descriptions.
+
+### Subagent execution engine
+
+When an agent delegates, the plugin spawns a child pi process with the target
+agent's configuration. The child runs in isolation — it gets `--model`,
+`--system-prompt`, and `--tools` from the executor, not from `settings.json`.
+This means:
+
+- The primary agent's `defaultAgent` never leaks into subagents
+- Each subagent runs with exactly the model and tools it declares
+- Skills load per-agent, with wildcard support (`security-*`, `git-*`)
+
+### OpenCode compatibility
+
+Your `.opencode/agent/` files work as-is. The `tools` map format is auto-converted
+to permission rules, and pi-specific fields (`thinking`, `maxDepth`, `allowedAgents`)
+are simply ignored by OpenCode without breaking:
+
+```yaml
+# OpenCode format — works in pi without changes
+name: triage
+mode: subagent
+tools:
+  read: true
+  bash: false
+```
+
+### Mode-based visibility
+
+| `mode` | TUI selector | `subagent` tool | `set_agent` tool |
+|--------|-------------|-----------------|------------------|
+| `primary` | ✅ visible | ❌ | ✅ |
+| `subagent` | ❌ | ✅ available | ✅ |
+| `all` (default) | ✅ visible | ✅ available | ✅ |
+
+Use `primary` for user-facing agents, `subagent` for delegated workers, `all` when
+an agent serves both roles.
+
+---
 
 ## Agent definition format
 
 ```yaml
 ---
-# === Identity ===
-name: code-reviewer                # required
-description: Reviews code for quality and security issues
-mode: subagent                     # primary | subagent | all (default: all)
-hidden: false                      # hide from TUI selectors
+name: my-agent                          # required
+description: One-line description
+mode: subagent                          # primary | subagent | all (default: all)
+hidden: false                           # hide from TUI selectors
 color: "#44BA81"
 
-# === Model ===
-model: anthropic/claude-sonnet     # per-agent override
+model: anthropic/claude-sonnet          # per-agent model override
+thinking: xhigh                         # off|minimal|low|medium|high|xhigh
+systemPrompt: replace                   # append | replace | replace-all (default: append)
 
-# === Execution ===
-thinking: xhigh                    # off|minimal|low|medium|high|xhigh
-systemPrompt: append               # append | replace | replace-all (default: append)
-
-# === Permissions (OpenCode-style) ===
 permission:
   "*": allow
-  "edit": deny                     # read-only agent
-  "bash":
-    "git *": allow                 # can run git commands only
+  "question": deny
+  "edit":
+    "*.env": deny
 
-# === Subagent controls ===
-maxDepth: 5                        # recursion limit when spawning subagents
-allowedAgents: [explorer]          # which subagents this can spawn
-skills: security-audit, git-*      # per-agent skills with wildcards
+maxDepth: 5                             # subagent recursion limit
+allowedAgents: [explorer]               # restrict which subagents this can spawn
+skills: security-audit, git-*           # per-agent skills with wildcards
 ---
-You are a code reviewer. Analyze code for bugs, security vulnerabilities,
-and maintainability issues. Never modify files — report findings only.
+Your prompt goes here. This becomes the agent's system prompt.
 ```
 
-### How the body becomes the system prompt
+### System prompt modes
 
-The markdown body after the frontmatter becomes the agent's prompt. The `systemPrompt`
-field controls how it interacts with pi's default system prompt:
+The `systemPrompt` field controls how the agent body interacts with pi's default
+prompt:
 
 | Mode | Behavior |
 |------|----------|
-| `append` (default) | Agent body is prepended to pi's system prompt |
-| `replace` | Agent body replaces pi's system prompt entirely |
-| `replace-all` | Only the agent body is used — pi's prompt is discarded entirely |
+| `append` (default) | Agent body prepended to pi's system prompt |
+| `replace` | Agent body **replaces** pi's system prompt entirely |
+| `replace-all` | Only agent body — pi's prompt discarded entirely |
 
-For **subagents** (child process), the agent body **is** the system prompt — pi's default
-prompt is not included. If the agent has `skills:`, they are injected as an XML block
-after the body.
+For **subagents** (child process), the agent body **is** the system prompt —
+pi's default prompt is not included. Skills are injected as an XML block after
+the body.
 
-### Auto-injected subagent guidance
-
-If an agent has the `subagent` tool available, the plugin automatically appends a
-`## Subagent Delegation` section to the system prompt. This section:
-
-- Lists all available subagents (name + description), filtered by `allowedAgents`
-- Shows the correct call syntax: `subagent({ agent: "<name>", task: "<task>" })`
-- Warns that subagent names are **not** CLI commands
-
-This means agent authors **never** need to explain delegation mechanics in their prompts.
-The plugin handles it, just like pi handles tool descriptions.
+---
 
 ## Discovery paths
 
@@ -208,13 +196,7 @@ Agents are loaded from multiple locations (project overrides global by name):
 | `.opencode/{agent,agents,mode}/*.md` | Project | OpenCode |
 | `.agents/*.md` | Project | Shared |
 
-### Mode-based visibility
-
-| `mode` | TUI selector | `subagent` tool | `set_agent` tool |
-|--------|-------------|-----------------|------------------|
-| `primary` | ✅ visible | ❌ | ✅ |
-| `subagent` | ❌ | ✅ available | ✅ |
-| `all` (default) | ✅ visible | ✅ available | ✅ |
+---
 
 ## Usage
 
@@ -237,36 +219,23 @@ Agents are loaded from multiple locations (project overrides global by name):
 | `search_agents` | Search agents by name/description/body |
 | `subagent` | Delegate task to a subagent (subagent/all mode only) |
 
-## Migration from pi-agent-mode + pi-subagents
-
-1. Install: `pi install pi-open-agents`
-2. Remove `npm:pi-agent-mode` and `npm:@johnnywu/pi-subagents` from settings
-3. Existing agent `.md` files work without changes (default `mode: all`)
-4. Gradually add `mode: primary` or `mode: subagent` to control visibility
-5. Gradually adopt `permission:` over `tools:` whitelist
-
-### Using OpenCode agents in pi
-
-If you already have OpenCode agent definitions in `.opencode/agent/`, they work
-out of the box — no conversion needed:
-
-```yaml
 ---
-# OpenCode format — works as-is in pi
-name: triage
-mode: subagent
-model: openai/gpt-4o
-tools:
-  read: true
-  bash: false
-description: Triages issues by reading and categorizing them.
----
-You are an issue triage agent...
+
+## Migration
+
+```bash
+pi install pi-open-agents
 ```
 
-The `tools` map is automatically converted to permission rules (`true` → `allow`,
-`false` → `deny`). Fields that are pi-specific (`thinking`, `maxDepth`,
-`allowedAgents`) are ignored by OpenCode without breaking.
+Remove `npm:pi-agent-mode` and `npm:@johnnywu/pi-subagents` from `settings.json`.
+Existing agent `.md` files work without changes.
+
+Optional cleanup:
+
+1. Add `mode: primary` or `mode: subagent` to agent files for explicit visibility
+2. Gradually adopt `permission:` over the old `tools:` whitelist
+
+---
 
 ## Development
 
@@ -283,6 +252,8 @@ docker compose run --rm pi-sandbox
 ```
 
 See [ARCHITECTURE.md](./ARCHITECTURE.md) for the full technical design.
+
+---
 
 ## Attribution
 
