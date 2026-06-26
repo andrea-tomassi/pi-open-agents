@@ -1,5 +1,9 @@
 # pi-open-agents
 
+<p align="center">
+  <img src="./pi-open-agents-banner.png" alt="pi-open-agents" width="640">
+</p>
+
 [![npm version](https://img.shields.io/npm/v/pi-open-agents.svg)](https://www.npmjs.com/package/pi-open-agents)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![pi](https://img.shields.io/badge/pi-coding%20agent-blue)](https://pi.dev)
