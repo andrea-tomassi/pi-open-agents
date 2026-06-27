@@ -19,7 +19,7 @@ Replaces `pi-agent-mode` + `@johnnywu/pi-subagents` with one coherent plugin.
 ## Quick start
 
 ```bash
-pi install pi-open-agents
+pi install npm:pi-open-agents
 ```
 
 Remove old plugins from `~/.pi/agent/settings.json`:
@@ -234,7 +234,7 @@ Agents are loaded from multiple locations (project overrides global by name):
 ## Migration
 
 ```bash
-pi install pi-open-agents
+pi install npm:pi-open-agents
 ```
 
 Remove `npm:pi-agent-mode` and `npm:@johnnywu/pi-subagents` from `settings.json`.
