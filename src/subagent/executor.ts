@@ -339,6 +339,45 @@ function buildTaskArgument(task: string, taskFilePath: string | undefined): stri
   return taskFilePath ? `Task: @${taskFilePath}` : `Task: ${task}`;
 }
 
+// ─── Model Registry (best-effort) ───────────────────────────────────────────
+
+interface AuthFactory {
+  create(authPath?: string): unknown;
+}
+interface RegistryFactory {
+  create(authStore: unknown, modelsPath: string | undefined): ContextWindowLookup;
+}
+
+/**
+ * Build a model registry for cost/context-window enrichment — best-effort and
+ * resilient.
+ *
+ * AuthStorage/ModelRegistry availability and signatures vary across
+ * pi-coding-agent host versions (AuthStorage was removed in newer releases;
+ * ModelRegistry's create() signature also changed). The registry is purely
+ * cosmetic — downstream usage enrichment tolerates a missing registry (see the
+ * contextWindowFromMessage / usageFromMessage guards). This must never throw, or
+ * subagent delegation breaks entirely. Factories are injectable for testing;
+ * pass `{ auth: undefined, model: undefined }` to simulate a host that lacks
+ * these symbols.
+ */
+export function buildModelRegistry(
+  agentDir: string | undefined,
+  factories: { auth?: AuthFactory; model?: RegistryFactory } = {},
+): ContextWindowLookup | undefined {
+  const auth = ("auth" in factories ? factories.auth : AuthStorage) as AuthFactory | undefined;
+  const model = ("model" in factories ? factories.model : ModelRegistry) as RegistryFactory | undefined;
+  try {
+    if (!auth || typeof auth.create !== "function") return undefined;
+    if (!model || typeof model.create !== "function") return undefined;
+    const authPath = agentDir ? path.join(agentDir, "auth.json") : undefined;
+    const modelsPath = agentDir ? path.join(agentDir, "models.json") : undefined;
+    return model.create(auth.create(authPath), modelsPath);
+  } catch {
+    return undefined;
+  }
+}
+
 // ─── Main Executor ───────────────────────────────────────────────────────────
 
 /**
@@ -413,13 +452,8 @@ export async function runSubagent(options: RunSubagentOptions): Promise<AgentRes
     // ── Resolve pi CLI entry point ──
     const pi = await resolvePi();
 
-    // ── Build model registry for cost lookups ──
-    const modelRegistry = ModelRegistry.create(
-      AuthStorage.create(
-        options.agentDir ? path.join(options.agentDir, "auth.json") : undefined,
-      ),
-      options.agentDir ? path.join(options.agentDir, "models.json") : undefined,
-    );
+    // ── Build model registry for cost lookups (best-effort) ──
+    const modelRegistry = buildModelRegistry(options.agentDir);
 
     // ── Build CLI args ──
     const args = [
