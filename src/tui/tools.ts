@@ -14,6 +14,7 @@ import { Type } from "typebox";
 import type { AgentDefinition } from "../types.ts";
 import { selectableAgents } from "../discovery/loader.ts";
 import type { AgentManager } from "../primary/manager.ts";
+import { isSubagentProcess } from "../subagent/env.ts";
 import { updateBanner } from "./banner.ts";
 
 /**
@@ -32,12 +33,20 @@ export function registerAgentTools(manager: AgentManager, pi: ExtensionAPI): voi
       reason: Type.Optional(Type.String({ description: "Reason for switching agents" })),
     }),
     async execute(_toolCallId, params, _signal, _onUpdate, ctx: ExtensionContext) {
+      if (isSubagentProcess(process.env)) {
+        throw new Error("set_agent is only available to the primary agent, not subagents.");
+      }
+
       const { agent: name, reason } = params;
 
       const agent = manager.getAgent(name);
       if (!agent) {
         const available = manager.getAgents().map((a) => a.name).join(", ") || "(none defined)";
         throw new Error(`Unknown agent "${name}". Available: ${available}`);
+      }
+
+      if (agent.mode === "subagent") {
+        throw new Error(`Agent "${name}" is a subagent and cannot be set as the primary agent.`);
       }
 
       const success = await manager.apply(name, pi, ctx);
