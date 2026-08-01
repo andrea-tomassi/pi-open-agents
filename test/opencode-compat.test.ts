@@ -185,8 +185,8 @@ Agent body`;
   assert.ok(agent.permission);
   assert.equal(agent.permission.read, "allow");
   assert.equal(agent.permission.bash, "allow");
-  // write → edit (OC convention)
-  assert.equal(agent.permission.edit, "deny");
+  // write is its own permission key (separate from edit in pi)
+  assert.equal(agent.permission.write, "deny");
   assert.equal(agent.permission.webfetch, "deny");
   // tools array is NOT set (map was converted to permission)
   assert.equal(agent.tools, undefined);

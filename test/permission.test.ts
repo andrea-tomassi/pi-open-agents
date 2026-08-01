@@ -113,8 +113,8 @@ test("matcher: isWildcardPattern", () => {
 
 // ─── Tool → Permission Mapping ───────────────────────────────────────────────
 
-test("toolToPermission: write maps to edit", () => {
-  assert.equal(toolToPermission("write"), "edit");
+test("toolToPermission: write and edit are separate categories", () => {
+  assert.equal(toolToPermission("write"), "write");
   assert.equal(toolToPermission("edit"), "edit");
   assert.equal(toolToPermission("apply_patch"), "edit");
 });
@@ -157,10 +157,11 @@ test("evaluator: allow by pattern", () => {
   assert.equal(result.pattern, "*.md");
 });
 
-test("evaluator: write maps to edit permission", () => {
+test("evaluator: write uses its own permission category", () => {
   const result = evaluate("write", "file.env", RULES);
-  assert.equal(result.action, "deny");
-  assert.equal(result.permission, "edit");
+  // write is no longer mapped to edit — no rule matches, defaults to ask
+  assert.equal(result.action, "ask");
+  assert.equal(result.permission, "write");
 });
 
 test("evaluator: no match defaults to ask", () => {
@@ -209,7 +210,7 @@ test("getDisabledTools: deny with * disables tool", () => {
 
   assert.ok(disabled.has("bash"));
   assert.ok(disabled.has("edit"));
-  assert.ok(disabled.has("write")); // write maps to edit
+  assert.ok(!disabled.has("write")); // write is separate from edit now
   assert.ok(!disabled.has("read"));
 });
 

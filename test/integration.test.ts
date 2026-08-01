@@ -69,6 +69,7 @@ thinking: xhigh
 permission:
   bash: deny
   edit: deny
+  write: deny
   read: allow
 ---
 You assess code and write plans.`,
@@ -252,7 +253,7 @@ test("integration: disabled tools correctly identified", async () => {
 
   assert.ok(disabled.has("bash"));
   assert.ok(disabled.has("edit"));
-  assert.ok(disabled.has("write")); // write → edit → denied
+  assert.ok(disabled.has("write")); // explicitly denied in agent definition
   assert.ok(!disabled.has("read"));
   assert.ok(!disabled.has("grep"));
 });
