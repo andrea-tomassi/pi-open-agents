@@ -20,15 +20,19 @@ import { matchPattern } from "./matcher.ts";
 /**
  * Map a tool name to its permission category.
  *
- * Multiple tools can share a permission category:
- *   write, edit, apply_patch  → "edit"
+ * Some tools share a permission category with another tool:
+ *   apply_patch → "edit"  (OpenCode-only tool, functionally equivalent to edit)
  *   list_mcp_resources, read_mcp_resource → "read"
+ *
+ * In pi, `write` and `edit` are SEPARATE tools (create/overwrite vs
+ * search-and-replace). They must stay as separate permission categories so
+ * that `{edit: true, write: false}` works as expected.
  *
  * Everything else maps by tool name directly.
  */
 export function toolToPermission(toolName: string): string {
-  // File-editing tools all map to "edit"
-  if (toolName === "write" || toolName === "edit" || toolName === "apply_patch") {
+  // OpenCode's apply_patch maps to pi's edit (no apply_patch tool in pi)
+  if (toolName === "apply_patch") {
     return "edit";
   }
 
