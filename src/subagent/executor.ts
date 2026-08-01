@@ -556,10 +556,16 @@ export async function runSubagent(options: RunSubagentOptions): Promise<AgentRes
       }
 
       if (event.type === "message_end" && event.message) {
-        const text = textFromMessage(event.message);
-        if (text !== undefined) output = text;
-        updateUsage(usage, usageFromMessage(event.message, modelRegistry));
-        model = modelFromMessage(event.message) ?? model;
+        // pi 0.83.0+ emits message_end for EVERY role (user, assistant, toolResult),
+        // not just assistant. Only capture text/usage/model from assistant messages —
+        // otherwise the echoed user task ("Task: ...") and raw tool results leak into
+        // the subagent output when the final assistant turn has no text part.
+        if ((event.message as { role?: unknown }).role === "assistant") {
+          const text = textFromMessage(event.message);
+          if (text !== undefined) output = text;
+          updateUsage(usage, usageFromMessage(event.message, modelRegistry));
+          model = modelFromMessage(event.message) ?? model;
+        }
         emit();
         return;
       }
