@@ -19,7 +19,6 @@ export type RecursionEnv = Partial<
     | "PI_OPEN_AGENTS_SYSTEM_PROMPT_MODE"
     | "PI_OPEN_AGENTS_ALLOWED"
     | "PI_OPEN_AGENTS_SESSION"
-    | "PI_OPEN_AGENTS_PERMISSION"
     | "PI_OPEN_AGENTS_DEBUG",
     string
   >
