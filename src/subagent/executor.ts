@@ -143,6 +143,41 @@ const defaultExecutorFs: ExecutorFs = {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
+/**
+ * Derive a tools whitelist from the agent definition for the child process.
+ *
+ * The `--tools` CLI flag is a whitelist (include only these). It works with:
+ * - Explicit `agent.tools` array (pi-style CSV)
+ * - Simple permission allow-lists (keys with "allow", no wildcard)
+ *
+ * Does NOT work with:
+ * - Wildcard permissions (`*: allow` + specific denies) — can't derive a
+ *   finite whitelist. The child gets all tools. This is a known limitation
+ *   of the `--tools` flag (it's a whitelist, not a deny-list).
+ * - Pattern-based permissions (`edit: { "*.env": deny }`) — patterns can't
+ *   be expressed as a flat tool whitelist.
+ */
+function deriveToolsWhitelist(agent: AgentDefinition): string[] | undefined {
+  // Explicit tools array — use directly
+  if (agent.tools && agent.tools.length > 0) {
+    return agent.tools;
+  }
+
+  // Derive from permission config
+  if (agent.permission) {
+    // Can't derive a finite whitelist when wildcard is present
+    if ("*" in agent.permission) return undefined;
+
+    const allowed = Object.entries(agent.permission)
+      .filter(([, value]) => value === "allow")
+      .map(([key]) => key);
+
+    return allowed.length > 0 ? allowed : undefined;
+  }
+
+  return undefined;
+}
+
 function emptyUsage(): AgentUsage {
   return { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0, contextTokens: 0 };
 }
@@ -478,8 +513,9 @@ export async function runSubagent(options: RunSubagentOptions): Promise<AgentRes
     args.push("--thinking", options.agent.thinking);
 
     // Tools whitelist
-    if (options.agent.tools && options.agent.tools.length > 0) {
-      args.push("--tools", options.agent.tools.join(","));
+    const toolsWhitelist = deriveToolsWhitelist(options.agent);
+    if (toolsWhitelist && toolsWhitelist.length > 0) {
+      args.push("--tools", toolsWhitelist.join(","));
     }
 
     // System prompt file (append or replace)

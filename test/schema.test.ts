@@ -146,8 +146,8 @@ test("schema: OC tools map converts to permission", () => {
   assert.ok(agent.permission);
   assert.equal(agent.permission.read, "allow");
   assert.equal(agent.permission.bash, "deny");
-  // write maps to edit (OpenCode convention)
-  assert.equal(agent.permission.edit, "allow");
+  // write is its own permission key (separate from edit in pi)
+  assert.equal(agent.permission.write, "allow");
   assert.equal(agent.tools, undefined);
 });
 
@@ -157,6 +157,21 @@ test("schema: pi CSV tools parsed as array", () => {
 
   assert.ok(agent.tools);
   assert.deepEqual(agent.tools, ["read", "bash", "edit"]);
+});
+
+test("schema: tools map preserves separate edit and write permissions (issue #4)", () => {
+  const content = makeContent(
+    "name: test\ntools:\n  read: true\n  edit: true\n  write: false\n  bash: false",
+  );
+  const agent = parseAgentDefinition(content, "/test.md", "global", DEFAULTS);
+
+  assert.ok(agent.permission);
+  // edit stays allow — not overwritten by write: false
+  assert.equal(agent.permission.edit, "allow");
+  // write is its own key
+  assert.equal(agent.permission.write, "deny");
+  assert.equal(agent.permission.read, "allow");
+  assert.equal(agent.permission.bash, "deny");
 });
 
 // ─── Mixed Agent Definition ──────────────────────────────────────────────────

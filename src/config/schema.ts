@@ -183,6 +183,10 @@ function parseToolsAndPermission(
  * Convert OpenCode-style tools map to PermissionConfig.
  *
  * { "read": true, "write": false } → { "read": "allow", "write": "deny" }
+ *
+ * `write` and `edit` are kept as separate keys — in pi they are separate
+ * tools (create/overwrite vs search-and-replace). Only `apply_patch`
+ * (OpenCode-only) is mapped to `edit`.
  */
 function toolsMapToPermission(toolsMap: Record<string, unknown>): PermissionConfig {
   const config: PermissionConfig = {};
@@ -191,8 +195,8 @@ function toolsMapToPermission(toolsMap: Record<string, unknown>): PermissionConf
     // Skip non-boolean values
     if (typeof enabled !== "boolean") continue;
 
-    // Map edit-like tools to "edit" permission (OpenCode convention)
-    const permKey = toolName === "write" || toolName === "edit" || toolName === "apply_patch"
+    // Map OpenCode-only tools to their pi equivalent
+    const permKey = toolName === "apply_patch"
       ? "edit"
       : toolName;
 
