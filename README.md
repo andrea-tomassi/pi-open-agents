@@ -91,8 +91,10 @@ permission:
   "subagent": deny        # no delegation
 ```
 
-Tool names are normalized automatically: `write` → `edit`, `task` → `subagent`,
-`vscode` → `read`.
+Tool names are normalized automatically: `task` → `subagent`, `vscode` → `read`,
+`apply_patch` → `edit` (OpenCode-only tool). In pi, `write` and `edit` are
+**separate** tools — `write` creates/overwrites files, `edit` does search-and-
+replace — so they have separate permission categories.
 
 ### Auto-injected delegation guidance
 
@@ -118,6 +120,11 @@ This means:
 - Each subagent runs with exactly the model and tools it declares
 - Skills load per-agent, with wildcard support (`security-*`, `git-*`)
 
+The `--tools` whitelist is derived from both explicit `tools:` arrays and
+permission allow-lists. An agent with `permission: { read: allow, edit: allow }`
+will only get `read` and `edit` in the child process. Wildcard permissions
+(`*: allow`) cannot produce a finite whitelist — the child gets all tools.
+
 ### OpenCode compatibility
 
 Your `.opencode/agent/` files work as-is. The `tools` map format is auto-converted
@@ -132,6 +139,10 @@ tools:
   read: true
   bash: false
 ```
+
+The `tools` map is converted to permission rules and **also restricts the
+subagent child process** — a subagent with `tools: { read: true, bash: false }`
+will only have access to the `read` tool when spawned.
 
 ### Mode-based visibility
 
@@ -251,7 +262,7 @@ Optional cleanup:
 
 ```bash
 npm install
-npm test          # 84 tests
+npm test          # 97 tests
 npm run typecheck # tsc --noEmit
 ```
 
