@@ -34,6 +34,38 @@ Existing `.agent.md` files work without changes (default `mode: all`).
 
 ---
 
+## Agents vs subagents (and why you need both)
+
+People tend to lump "agents" and "subagents" together. They're not the same
+thing, and the difference is the whole game.
+
+An **agent** changes *your* session. Switch to one and the conversation you're
+already having starts thinking with a different brain — different prompt,
+different model, different tools, different rules. The thread keeps going;
+what's running it changes. Planning wants a slow, deliberate mind. Coding wants
+a fast one. Reviewing wants a skeptic. An agent is how you become the right one
+for the moment.
+
+A **subagent** never touches your session. It's a separate process you spin up
+for one job — usually on a cheaper, faster model, with locked-down permissions
+— that works in isolation and hands you back an answer. Your context stays
+clean; your main model keeps its focus.
+
+The payoff is using both. You sit in an **orchestrator** agent — the strong
+model holding the plan — and delegate the grunt work to subagents: search these
+five hundred files, run that test matrix, draft the boilerplate. One mind to
+think, many hands to do. You get the big model's reasoning *and* the small
+models' speed and economy, without one poisoning the other's context.
+
+And the moment you delegate, control stops being optional. A subagent is a real
+process with real tools — it can read your secrets, rewrite your files, run
+shell. So you choose its model, set its thinking level, clip its permissions to
+*read-only* or *git-only*, cap how deep it can recurse, decide who's even
+allowed to spawn whom. That's not red tape. It's what turns *delegate and pray*
+into *delegate and trust* — and it's exactly what this plugin gives you.
+
+---
+
 ## Why this exists
 
 Pi splits agent management across two separate plugins — one for primary agents,
