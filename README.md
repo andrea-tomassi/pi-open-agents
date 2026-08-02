@@ -260,9 +260,12 @@ Optional cleanup:
 
 ## Development
 
+**Contributing?** Please read the [Contributing Guide](./CONTRIBUTING.md) before
+opening an issue or pull request.
+
 ```bash
 npm install
-npm test          # 97 tests
+npm test          # 117 tests
 npm run typecheck # tsc --noEmit
 ```
 
