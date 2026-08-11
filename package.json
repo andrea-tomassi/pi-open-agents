@@ -30,7 +30,8 @@
     "src/",
     "README.md",
     "LICENSE",
-    "ATTRIBUTION.md"
+    "ATTRIBUTION.md",
+    "agents/"
   ],
   "scripts": {
     "typecheck": "tsc --noEmit",
