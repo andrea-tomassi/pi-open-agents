@@ -10,7 +10,7 @@
 
 export type AgentMode = "primary" | "subagent" | "all";
 
-export type ThinkingLevel = "off" | "minimal" | "low" | "medium" | "high" | "xhigh";
+export type ThinkingLevel = "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
 
 export type SystemPromptMode = "append" | "replace" | "replace-all";
 
@@ -19,7 +19,7 @@ export type PermissionAction = "allow" | "deny" | "ask";
 export type AgentSource = "global" | "project";
 
 export const THINKING_LEVELS: readonly ThinkingLevel[] = [
-  "off", "minimal", "low", "medium", "high", "xhigh",
+  "off", "minimal", "low", "medium", "high", "xhigh", "max",
 ] as const;
 
 export const SYSTEM_PROMPT_MODES: readonly SystemPromptMode[] = [

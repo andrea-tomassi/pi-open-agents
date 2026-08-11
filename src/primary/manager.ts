@@ -82,8 +82,8 @@ export class AgentManager {
       if (this.originalState.model) {
         await pi.setModel(this.originalState.model);
       }
-      // Restore thinking level
-      pi.setThinkingLevel(this.originalState.thinkingLevel);
+      // Restore thinking level (cast: pi-agent-core type lags behind on "max")
+      pi.setThinkingLevel(this.originalState.thinkingLevel as any);
       // Restore tools
       pi.setActiveTools(this.originalState.toolNames);
     } else {
