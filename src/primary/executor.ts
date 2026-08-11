@@ -64,7 +64,8 @@ async function applyModel(agent: AgentDefinition, pi: ExtensionAPI, ctx: Extensi
  * Falls back to the session's current thinking level if agent doesn't specify one.
  */
 function applyThinking(agent: AgentDefinition, pi: ExtensionAPI): void {
-  pi.setThinkingLevel(agent.thinking);
+  // Cast: pi-open-agents accepts "max" (aligned with CLI); pi-agent-core type lags behind
+  pi.setThinkingLevel(agent.thinking as any);
 }
 
 // ─── Tool Filtering ──────────────────────────────────────────────────────────
