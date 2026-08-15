@@ -161,7 +161,7 @@ OpenCode paths:
   .opencode/mode/*.md
 
 Shared paths:
-  .agents/*.md
+  .agents/agents/*.md
 ```
 
 **Frontmatter aliases** (transparent at parse time):

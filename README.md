@@ -247,7 +247,7 @@ Agents are loaded from multiple locations (project overrides global by name):
 | `~/.opencode/{agent,agents,mode}/*.md` | Global | OpenCode |
 | `.pi/agents/*.md` | Project | pi |
 | `.opencode/{agent,agents,mode}/*.md` | Project | OpenCode |
-| `.agents/*.md` | Project | Shared |
+| `.agents/agents/*.md` | Project | Shared |
 
 ---
 

@@ -4,6 +4,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { getDiscoveryPaths } from "../src/config/paths.ts";
 import { loadAgents, selectableAgents, spawnableAgents, agentsAvailableTo } from "../src/discovery/loader.ts";
 import type { AgentDefinition, AgentFs } from "../src/types.ts";
 
@@ -242,4 +243,31 @@ test("agentsAvailableTo: no allowedAgents means all spawnable", () => {
   assert.ok(names.includes("sub-1"));
   assert.ok(names.includes("sub-2"));
   assert.ok(names.includes("both-1"));
+});
+
+test("shared path scans .agents/agents only, not skills or commands", async () => {
+  const fs = makeMockFs({
+    "/project/.agents/agents/real.md": `---
+name: real
+mode: subagent
+---
+Real agent.`,
+    "/project/.agents/skills/SKILL.md": `---
+name: some-skill
+---
+Not an agent.`,
+    "/project/.agents/commands/debug.md": `---
+name: debug
+---
+Not an agent.`,
+  });
+
+  const result = await loadAgents({
+    fs,
+    cwd: "/project",
+    agentDir: "/home/user/.pi/agent",
+    paths: getDiscoveryPaths("/project", "/home/user/.pi/agent"),
+  });
+
+  assert.deepEqual(result.agents.map((a) => a.name), ["real"]);
 });

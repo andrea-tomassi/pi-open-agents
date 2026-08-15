@@ -302,7 +302,7 @@ Should load`,
 
 test("OC compat: loads from shared .agents/ directory", async () => {
   const fs = makeMockFs({
-    "/project/.agents/shared-agent.md": `---
+    "/project/.agents/agents/shared-agent.md": `---
 name: shared-agent
 mode: all
 description: Works in both pi and opencode
@@ -317,7 +317,7 @@ Shared agent body.`,
       dir: "/project/.agents",
       source: "project",
       family: "shared",
-      subdirs: [""],
+      subdirs: ["agents"],
     }],
   });
 

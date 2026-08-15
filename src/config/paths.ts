@@ -88,7 +88,7 @@ export function getDiscoveryPaths(cwd: string, agentDir: string): DiscoveryPath[
     dir: path.join(cwd, ".agents"),
     source: "project",
     family: "shared",
-    subdirs: [""],
+    subdirs: ["agents"],
   });
 
   return paths;
@@ -99,6 +99,7 @@ export function getDiscoveryPaths(cwd: string, agentDir: string): DiscoveryPath[
  *
  * For pi/shared: uses the filename without extension
  *   .pi/agents/my-agent.md → "my-agent"
+ *   .agents/agents/my-agent.md → "my-agent"
  *
  * For OpenCode: strips the subdir prefix
  *   .opencode/agent/triage.md → "triage"

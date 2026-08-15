@@ -23,7 +23,7 @@ import type { AgentFs } from "../src/types.ts";
  * - Global pi agents (~/.pi/agent/agents/)
  * - Project pi agents (.pi/agents/)
  * - Project OpenCode agents (.opencode/agent/)
- * - Shared agents (.agents/)
+ * - Shared agents (.agents/agents/)
  */
 function makeProjectFs(): AgentFs {
   const files: Record<string, string> = {
@@ -96,7 +96,7 @@ tools:
 You triage issues.`,
 
     // ── Shared agents ──
-    "/project/.agents/docs-writer.md": `---
+    "/project/.agents/agents/docs-writer.md": `---
 name: docs-writer
 mode: all
 description: Technical documentation writer
