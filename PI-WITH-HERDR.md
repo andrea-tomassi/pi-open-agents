@@ -45,7 +45,7 @@ workers — or mix kinds (pi + codex + claude in one fleet).
 
 ## Tutorial — reproduce our workstation setup
 
-Tested on our Linux workstation (workstation), Herdr 0.8.2, pi + pi-open-agents.
+Tested on our Ubuntu workstation, Herdr 0.8.2, pi + pi-open-agents.
 
 ### 1. Install Herdr
 
@@ -104,10 +104,10 @@ One workspace bound to the monorepo root, one tab per mission, roles encoded
 in tab titles. `herdr agent list` at any moment:
 
 ```
-π - [prod]   Jira                     idle
-π - [client] acme                 idle
-π - [client] portal   idle
-π - [client] contoso                   idle
+π - [prod]   tracker                  idle
+π - [client] acme                     idle
+π - [client] portal                   idle
+π - [client] contoso                  idle
 π - [infra]  gpu                      idle
 π - [oss]    pi-open-agents           working
 ```
