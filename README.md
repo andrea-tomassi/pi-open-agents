@@ -14,7 +14,7 @@ Replaces `pi-agent-mode` + `@johnnywu/pi-subagents` with one coherent plugin.
 
 > **Why pi?** Pi's minimalist core keeps system prompts under 1,000 tokens — making it exceptionally fast on local models and cheap on cloud APIs. pi-open-agents is built to leverage that minimalism. See [Pi vs OpenCode: Performance & Architecture](./PI-VS-OPencode.md) for a detailed comparison.
 >
-> **Running a fleet?** Pair pi + pi-open-agents with [Herdr](https://herdr.dev) for persistent workspaces, agent awareness, and cross-agent control — see [pi × Herdr × pi-open-agents](./PI-WITH-HERDR.md).
+> 🐑 **Herd your agents.** pi-open-agents + [Herdr](https://herdr.dev) runs a full team of coding agents — persistent workspaces, live agent awareness, control from one screen. **[Set up the stack in 5 commands →](./PI-WITH-HERDR.md)**
 
 ---
 
@@ -308,12 +308,14 @@ Optional cleanup:
 
 ---
 
-## Multi-agent fleets with Herdr
+## Run a fleet 🐑
 
-pi stays minimal on purpose. For orchestration breadth — persistent workspace/tabs,
-mouse-first UX, agent-to-agent awareness, a fleet of pi (or mixed-kind) agents
-supervised from one screen — we run [Herdr](https://herdr.dev) alongside this
-plugin. Tutorial + reference workstation setup: [pi × Herdr × pi-open-agents](./PI-WITH-HERDR.md).
+Pi stays minimal on purpose — one agent, done well. When you need **many**,
+add [Herdr](https://herdr.dev): persistent workspaces, mouse-first UX, live
+agent awareness (`idle` / `working` / `blocked`), and cross-agent control
+from one screen — pi, or any mix of the 25 supported agent kinds. Six agents,
+six sessions, zero chaos: that's the exact workstation setup documented in
+**[pi × Herdr × pi-open-agents](./PI-WITH-HERDR.md)**.
 
 ## Roadmap
 
