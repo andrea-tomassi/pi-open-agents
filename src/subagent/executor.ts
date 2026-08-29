@@ -113,6 +113,8 @@ export interface RunSubagentOptions {
   outputArchiveDir?: string;
   agentDir?: string;
   session?: SubagentSessionInfo;
+  /** Per-call model override ("provider/model-id"). Takes precedence over agent.model. */
+  modelOverride?: string;
   resolvePi?: () => Promise<PiResolution> | PiResolution;
   runner?: ProcessRunner;
   fs?: ExecutorFs;
@@ -504,9 +506,10 @@ export async function runSubagent(options: RunSubagentOptions): Promise<AgentRes
       args.push("--no-context-files");
     }
 
-    // Model override
-    if (options.agent.model) {
-      args.push("--model", options.agent.model);
+    // Model: per-call override wins over the agent definition default
+    const modelId = options.modelOverride ?? options.agent.model;
+    if (modelId) {
+      args.push("--model", modelId);
     }
 
     // Thinking level

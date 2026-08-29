@@ -94,6 +94,7 @@ here — or native in pi itself:
 | `AGENTS.md` adoption — anthropics/claude-code#31005 👍336, openai/codex#12115 👍109 | ✅ Native in pi: `AGENTS.md`/`CLAUDE.md` discovery with `AGENTS.override.md` layering |
 | Agent Skills standard (`.agents/skills/`) — agentskills/agentskills#15 👍183 | ✅ Native in pi; shared agents from `.agents/` (#7 aligns to the dotagents layout) |
 | Tool restrictions that actually reach subagents — anthropics/claude-code#18950 👍70 | ✅ Since v0.1.14, `tools:`/`permission:` restrict the child toolset via `--tools` (full parent inheritance → #8) |
+| Model selection per subagent / per call — sst/opencode#6651 👍71 | ✅ Per-agent `model:` + per-call `model:` override in `subagent()` (since v0.1.19) |
 | Reasoning effort per agent — Kilo-Org/kilocode#13105 👍8 | ✅ `thinking: off…xhigh` per agent, forwarded to the child process |
 | Delegation guards — Kilo-Org/kilocode#9985 | ✅ `allowedAgents` allowlist + `maxDepth` recursion limit |
 | Agent management UI — openai/codex#22321 👍41 | ✅ `/agent`, `/agents`, `/agent-search`, `Ctrl+Shift+M`, programmatic `set_agent` |
@@ -153,7 +154,7 @@ If an agent has the `subagent` tool, the plugin automatically appends a
 subagents and the correct call syntax:
 
 ```
-subagent({ agent: "<name>", task: "<task>" })
+subagent({ agent: "<name>", task: "<task>", cwd?, session?, model? })
 ```
 
 You never need to explain delegation mechanics in agent prompts. The plugin
@@ -169,6 +170,11 @@ This means:
 - The primary agent's `defaultAgent` never leaks into subagents
 - Each subagent runs with exactly the model and tools it declares
 - Skills load per-agent, with wildcard support (`security-*`, `git-*`)
+
+**Per-call model override:** the caller can override the agent's default for a
+single call — `subagent({ agent: "deep-research", task: "...", model: "zai/glm-5.3-flash" })`.
+Handy for "run this one task on the cheap model" without forking an agent
+definition. Malformed values (`no-slash`) are rejected before any spawn.
 
 The `--tools` whitelist is derived from both explicit `tools:` arrays and
 permission allow-lists. An agent with `permission: { read: allow, edit: allow }`
@@ -321,7 +327,7 @@ six sessions, zero chaos: that's the exact workstation setup documented in
 
 - **Parent permission inheritance** for subagents — #8
 - **Agent hot-reload** (or `/reload-agents`) — #9
-- **Per-call model override** in `subagent()` — #10
+- ~~**Per-call model override** in `subagent()`~~ — ✅ shipped in [0.1.19](https://github.com/andrea-tomassi/pi-open-agents/releases/tag/v0.1.19) (#10)
 - **Parallel subagent limit** — #11
 
 ---
