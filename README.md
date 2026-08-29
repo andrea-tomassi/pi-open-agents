@@ -82,6 +82,22 @@ have no permission system. `pi-open-agents` replaces both:
 
 ---
 
+## Popular requests, already covered
+
+Some of the most upvoted agent/subagent asks across the ecosystem are already
+here — or native in pi itself:
+
+| Asked elsewhere (👍) | Status in pi + pi-open-agents |
+|---|---|
+| `AGENTS.md` adoption — anthropics/claude-code#31005 👍336, openai/codex#12115 👍109 | ✅ Native in pi: `AGENTS.md`/`CLAUDE.md` discovery with `AGENTS.override.md` layering |
+| Agent Skills standard (`.agents/skills/`) — agentskills/agentskills#15 👍183 | ✅ Native in pi; shared agents from `.agents/` (#7 aligns to the dotagents layout) |
+| Tool restrictions that actually reach subagents — anthropics/claude-code#18950 👍70 | ✅ Since v0.1.14, `tools:`/`permission:` restrict the child toolset via `--tools` (full parent inheritance → #8) |
+| Reasoning effort per agent — Kilo-Org/kilocode#13105 👍8 | ✅ `thinking: off…xhigh` per agent, forwarded to the child process |
+| Delegation guards — Kilo-Org/kilocode#9985 | ✅ `allowedAgents` allowlist + `maxDepth` recursion limit |
+| Agent management UI — openai/codex#22321 👍41 | ✅ `/agent`, `/agents`, `/agent-search`, `Ctrl+Shift+M`, programmatic `set_agent` |
+
+---
+
 ## Features
 
 ### Per-agent model, thinking, and permissions
@@ -287,6 +303,15 @@ Optional cleanup:
 
 1. Add `mode: primary` or `mode: subagent` to agent files for explicit visibility
 2. Gradually adopt `permission:` over the old `tools:` whitelist
+
+---
+
+## Roadmap
+
+- **Parent permission inheritance** for subagents — #8
+- **Agent hot-reload** (or `/reload-agents`) — #9
+- **Per-call model override** in `subagent()` — #10
+- **Parallel subagent limit** — #11
 
 ---
 
