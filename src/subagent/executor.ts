@@ -15,6 +15,7 @@ import {
   withFileMutationQueue,
 } from "@earendil-works/pi-coding-agent";
 import { spawn } from "node:child_process";
+import { realpathSync } from "node:fs";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -195,10 +196,23 @@ export function subagentSessionDir(
   return path.join(agentDir, "sessions", safeProject, "subagents");
 }
 
-export function resolvePiEntryPoint(): PiResolution {
-  const packageEntryPoint = fileURLToPath(
-    import.meta.resolve("@earendil-works/pi-coding-agent"),
-  );
+export function resolvePiEntryPoint(
+  resolveSelf: (specifier: string) => string = (specifier) => import.meta.resolve(specifier),
+): PiResolution {
+  let packageEntryPoint: string;
+  try {
+    packageEntryPoint = fileURLToPath(resolveSelf("@earendil-works/pi-coding-agent"));
+  } catch {
+    // npm-distributed plugin + bundled pi: the loader resolves host imports
+    // through virtualModules, but import.meta.resolve falls back to native
+    // resolution which cannot see the host package from the plugin's install
+    // tree (peer dependencies are never installed next to it). Fall back to
+    // the running pi entry itself — the child must run the same pi anyway.
+    return {
+      command: process.execPath,
+      entryPoint: realpathSync(process.argv[1]),
+    };
+  }
   const packageRoot = path.dirname(path.dirname(packageEntryPoint));
   return {
     command: process.execPath,

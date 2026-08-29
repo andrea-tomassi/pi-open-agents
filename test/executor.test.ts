@@ -83,3 +83,27 @@ run("buildModelRegistry: handles undefined agentDir (no paths)", () => {
   const reg = buildModelRegistry!(undefined, { auth: fakeAuth, model: fakeModel });
   assert.ok(reg);
 });
+
+// ─── resolvePiEntryPoint fallback (npm-distributed plugin + bundled pi) ────────
+
+run("resolvePiEntryPoint: falls back to the running pi entry when self-resolution fails", async () => {
+  const { resolvePiEntryPoint } = (await import("../src/subagent/executor.ts")) as {
+    resolvePiEntryPoint: (r?: (s: string) => string) => { command: string; entryPoint: string };
+  };
+  const resolution = resolvePiEntryPoint(() => {
+    throw new Error("Cannot find module '@earendil-works/pi-coding-agent'");
+  });
+  assert.equal(resolution.command, process.execPath);
+  const realArgv1 = (await import("node:fs")).realpathSync(process.argv[1]);
+  assert.equal(resolution.entryPoint, realArgv1);
+});
+
+run("resolvePiEntryPoint: primary path unchanged when self-resolution works", async () => {
+  const { resolvePiEntryPoint } = (await import("../src/subagent/executor.ts")) as {
+    resolvePiEntryPoint: (r?: (s: string) => string) => { command: string; entryPoint: string };
+  };
+  const fakeEntry = "/fake/pkg/dist/index.js";
+  const resolution = resolvePiEntryPoint(() => `file://${fakeEntry}`);
+  assert.equal(resolution.command, process.execPath);
+  assert.equal(resolution.entryPoint, "/fake/pkg/dist/cli.js");
+});
