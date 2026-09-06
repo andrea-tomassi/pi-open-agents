@@ -9,11 +9,11 @@
  */
 
 import {
-  AuthStorage,
   ModelRegistry,
   SessionManager,
   withFileMutationQueue,
 } from "@earendil-works/pi-coding-agent";
+import * as piCodingAgent from "@earendil-works/pi-coding-agent";
 import { spawn } from "node:child_process";
 import { realpathSync } from "node:fs";
 import * as fs from "node:fs/promises";
@@ -416,7 +416,11 @@ export function buildModelRegistry(
   agentDir: string | undefined,
   factories: { auth?: AuthFactory; model?: RegistryFactory } = {},
 ): ContextWindowLookup | undefined {
-  const auth = ("auth" in factories ? factories.auth : AuthStorage) as AuthFactory | undefined;
+  // AuthStorage was removed from newer pi-coding-agent hosts. A static named
+  // import of it would fail module linking on hosts that no longer export it,
+  // so look it up on the namespace object instead (absent → undefined).
+  const hostAuth = (piCodingAgent as Record<string, unknown>).AuthStorage;
+  const auth = ("auth" in factories ? factories.auth : hostAuth) as AuthFactory | undefined;
   const model = ("model" in factories ? factories.model : ModelRegistry) as RegistryFactory | undefined;
   try {
     if (!auth || typeof auth.create !== "function") return undefined;
