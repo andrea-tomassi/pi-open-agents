@@ -271,7 +271,13 @@ Agents are loaded from multiple locations (project overrides global by name):
 | `~/.opencode/{agent,agents,mode}/*.md` | Global | OpenCode |
 | `.pi/agents/*.md` | Project | pi |
 | `.opencode/{agent,agents,mode}/*.md` | Project | OpenCode |
-| `.agents/*.md` | Project | Shared |
+| `.agents/agents/*.md` | Project | Shared |
+
+> **⚠️ Migration note (v0.1.22):** discovery in the shared `.agents/` directory is now
+> scoped to `​.agents/agents/*.md` — previously *every* markdown file under `.agents/`
+> (including `skills/` and `commands/`) was parsed as an agent and showed up in `/agents`
+> and the `subagent` tool. If you relied on the loose loading, move your agent files into
+> `.agents/agents/`. Skills and commands are picked up natively by pi as before. (#14)
 
 ---
 
