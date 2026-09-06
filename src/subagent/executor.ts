@@ -9,12 +9,13 @@
  */
 
 import {
-  AuthStorage,
   ModelRegistry,
   SessionManager,
   withFileMutationQueue,
 } from "@earendil-works/pi-coding-agent";
+import * as piCodingAgent from "@earendil-works/pi-coding-agent";
 import { spawn } from "node:child_process";
+import { realpathSync } from "node:fs";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -113,6 +114,8 @@ export interface RunSubagentOptions {
   outputArchiveDir?: string;
   agentDir?: string;
   session?: SubagentSessionInfo;
+  /** Per-call model override ("provider/model-id"). Takes precedence over agent.model. */
+  modelOverride?: string;
   resolvePi?: () => Promise<PiResolution> | PiResolution;
   runner?: ProcessRunner;
   fs?: ExecutorFs;
@@ -193,10 +196,23 @@ export function subagentSessionDir(
   return path.join(agentDir, "sessions", safeProject, "subagents");
 }
 
-export function resolvePiEntryPoint(): PiResolution {
-  const packageEntryPoint = fileURLToPath(
-    import.meta.resolve("@earendil-works/pi-coding-agent"),
-  );
+export function resolvePiEntryPoint(
+  resolveSelf: (specifier: string) => string = (specifier) => import.meta.resolve(specifier),
+): PiResolution {
+  let packageEntryPoint: string;
+  try {
+    packageEntryPoint = fileURLToPath(resolveSelf("@earendil-works/pi-coding-agent"));
+  } catch {
+    // npm-distributed plugin + bundled pi: the loader resolves host imports
+    // through virtualModules, but import.meta.resolve falls back to native
+    // resolution which cannot see the host package from the plugin's install
+    // tree (peer dependencies are never installed next to it). Fall back to
+    // the running pi entry itself — the child must run the same pi anyway.
+    return {
+      command: process.execPath,
+      entryPoint: realpathSync(process.argv[1]),
+    };
+  }
   const packageRoot = path.dirname(path.dirname(packageEntryPoint));
   return {
     command: process.execPath,
@@ -400,7 +416,11 @@ export function buildModelRegistry(
   agentDir: string | undefined,
   factories: { auth?: AuthFactory; model?: RegistryFactory } = {},
 ): ContextWindowLookup | undefined {
-  const auth = ("auth" in factories ? factories.auth : AuthStorage) as AuthFactory | undefined;
+  // AuthStorage was removed from newer pi-coding-agent hosts. A static named
+  // import of it would fail module linking on hosts that no longer export it,
+  // so look it up on the namespace object instead (absent → undefined).
+  const hostAuth = (piCodingAgent as Record<string, unknown>).AuthStorage;
+  const auth = ("auth" in factories ? factories.auth : hostAuth) as AuthFactory | undefined;
   const model = ("model" in factories ? factories.model : ModelRegistry) as RegistryFactory | undefined;
   try {
     if (!auth || typeof auth.create !== "function") return undefined;
@@ -504,9 +524,10 @@ export async function runSubagent(options: RunSubagentOptions): Promise<AgentRes
       args.push("--no-context-files");
     }
 
-    // Model override
-    if (options.agent.model) {
-      args.push("--model", options.agent.model);
+    // Model: per-call override wins over the agent definition default
+    const modelId = options.modelOverride ?? options.agent.model;
+    if (modelId) {
+      args.push("--model", modelId);
     }
 
     // Thinking level

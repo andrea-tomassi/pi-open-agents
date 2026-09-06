@@ -47,6 +47,7 @@ interface SubagentParams {
   task: string;
   cwd?: string;
   session?: SubagentSessionMode;
+  model?: string;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -199,7 +200,7 @@ export function registerSubagentTool(
     name: "subagent",
     label: "Subagent",
     description: "Delegate a task to a named sub-agent running in an isolated pi process.",
-    promptSnippet: "Delegate isolated tasks with subagent({ agent, task, cwd?, session? }).",
+    promptSnippet: "Delegate isolated tasks with subagent({ agent, task, cwd?, session?, model? }).",
     promptGuidelines,
     parameters: Type.Object({
       agent: Type.String({ description: "Name of the agent to invoke" }),
@@ -208,6 +209,11 @@ export function registerSubagentTool(
       session: Type.Optional(
         Type.Union([Type.Literal("none"), Type.Literal("fork")], {
           description: 'Parent session handling: none starts a fresh subagent session, fork branches from the current session',
+        }),
+      ),
+      model: Type.Optional(
+        Type.String({
+          description: 'Per-call model override in "provider/model-id" format (e.g. "anthropic/claude-sonnet-4-5"). Takes precedence over the agent definition default.',
         }),
       ),
     }),
@@ -237,6 +243,13 @@ export function registerSubagentTool(
       }
 
       const childCwd = params.cwd ?? ctx.cwd;
+
+      if (params.model !== undefined && !/^[^/\s]+\/[^/\s]+$/.test(params.model)) {
+        throw new Error(
+          `Invalid model "${params.model}": expected "provider/model-id" format (e.g. "anthropic/claude-sonnet-4-5").`,
+        );
+      }
+
       const session = resolveSubagentSession(
         params.session,
         childCwd,
@@ -254,6 +267,7 @@ export function registerSubagentTool(
         availableAgents: availableSubagentsForAgent(agent, availableSubagents),
         agentDir: options.agentDir,
         session,
+        modelOverride: params.model,
         onProgress: (progress) => onUpdate?.(toProgressResult(progress)),
       });
 

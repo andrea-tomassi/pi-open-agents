@@ -13,6 +13,8 @@ Unified agent and subagent management for [pi](https://pi.dev), with [OpenCode](
 Replaces `pi-agent-mode` + `@johnnywu/pi-subagents` with one coherent plugin.
 
 > **Why pi?** Pi's minimalist core keeps system prompts under 1,000 tokens — making it exceptionally fast on local models and cheap on cloud APIs. pi-open-agents is built to leverage that minimalism. See [Pi vs OpenCode: Performance & Architecture](./PI-VS-OPencode.md) for a detailed comparison.
+>
+> 🐑 **Herd your agents.** pi-open-agents + [Herdr](https://herdr.dev) runs a full team of coding agents — persistent workspaces, live agent awareness, control from one screen. **[Set up the stack in 5 commands →](./PI-WITH-HERDR.md)**
 
 ---
 
@@ -82,6 +84,23 @@ have no permission system. `pi-open-agents` replaces both:
 
 ---
 
+## Popular requests, already covered
+
+Some of the most upvoted agent/subagent asks across the ecosystem are already
+here — or native in pi itself:
+
+| Asked elsewhere (👍) | Status in pi + pi-open-agents |
+|---|---|
+| `AGENTS.md` adoption — anthropics/claude-code#31005 👍336, openai/codex#12115 👍109 | ✅ Native in pi: `AGENTS.md`/`CLAUDE.md` discovery with `AGENTS.override.md` layering |
+| Agent Skills standard (`.agents/skills/`) — agentskills/agentskills#15 👍183 | ✅ Native in pi; shared agents from `.agents/` (#7 aligns to the dotagents layout) |
+| Tool restrictions that actually reach subagents — anthropics/claude-code#18950 👍70 | ✅ Since v0.1.14, `tools:`/`permission:` restrict the child toolset via `--tools` (full parent inheritance → #8) |
+| Model selection per subagent / per call — sst/opencode#6651 👍71 | ✅ Per-agent `model:` + per-call `model:` override in `subagent()` (since v0.1.19) |
+| Reasoning effort per agent — Kilo-Org/kilocode#13105 👍8 | ✅ `thinking: off…xhigh` per agent, forwarded to the child process |
+| Delegation guards — Kilo-Org/kilocode#9985 | ✅ `allowedAgents` allowlist + `maxDepth` recursion limit |
+| Agent management UI — openai/codex#22321 👍41 | ✅ `/agent`, `/agents`, `/agent-search`, `Ctrl+Shift+M`, programmatic `set_agent` |
+
+---
+
 ## Features
 
 ### Per-agent model, thinking, and permissions
@@ -135,7 +154,7 @@ If an agent has the `subagent` tool, the plugin automatically appends a
 subagents and the correct call syntax:
 
 ```
-subagent({ agent: "<name>", task: "<task>" })
+subagent({ agent: "<name>", task: "<task>", cwd?, session?, model? })
 ```
 
 You never need to explain delegation mechanics in agent prompts. The plugin
@@ -151,6 +170,11 @@ This means:
 - The primary agent's `defaultAgent` never leaks into subagents
 - Each subagent runs with exactly the model and tools it declares
 - Skills load per-agent, with wildcard support (`security-*`, `git-*`)
+
+**Per-call model override:** the caller can override the agent's default for a
+single call — `subagent({ agent: "deep-research", task: "...", model: "zai/glm-5.3-flash" })`.
+Handy for "run this one task on the cheap model" without forking an agent
+definition. Malformed values (`no-slash`) are rejected before any spawn.
 
 The `--tools` whitelist is derived from both explicit `tools:` arrays and
 permission allow-lists. An agent with `permission: { read: allow, edit: allow }`
@@ -247,7 +271,7 @@ Agents are loaded from multiple locations (project overrides global by name):
 | `~/.opencode/{agent,agents,mode}/*.md` | Global | OpenCode |
 | `.pi/agents/*.md` | Project | pi |
 | `.opencode/{agent,agents,mode}/*.md` | Project | OpenCode |
-| `.agents/agents/*.md` | Project | Shared |
+| `.agents/*.md` | Project | Shared |
 
 ---
 
@@ -287,6 +311,24 @@ Optional cleanup:
 
 1. Add `mode: primary` or `mode: subagent` to agent files for explicit visibility
 2. Gradually adopt `permission:` over the old `tools:` whitelist
+
+---
+
+## Run a fleet 🐑
+
+Pi stays minimal on purpose — one agent, done well. When you need **many**,
+add [Herdr](https://herdr.dev): persistent workspaces, mouse-first UX, live
+agent awareness (`idle` / `working` / `blocked`), and cross-agent control
+from one screen — pi, or any mix of the 25 supported agent kinds. Six agents,
+six sessions, zero chaos: that's the exact workstation setup documented in
+**[pi × Herdr × pi-open-agents](./PI-WITH-HERDR.md)**.
+
+## Roadmap
+
+- **Parent permission inheritance** for subagents — #8
+- **Agent hot-reload** (or `/reload-agents`) — #9
+- ~~**Per-call model override** in `subagent()`~~ — ✅ shipped in [0.1.19](https://github.com/andrea-tomassi/pi-open-agents/releases/tag/v0.1.19) (#10)
+- **Parallel subagent limit** — #11
 
 ---
 
