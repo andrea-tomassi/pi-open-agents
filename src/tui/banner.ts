@@ -1,11 +1,21 @@
 /**
  * Status banner widget for the TUI.
  *
- * Shows the active agent name, model, and description above the editor.
+ * Shows the active agent name, description (when enabled), and model above the editor.
  */
 
 import type { ExtensionUIContext } from "@earendil-works/pi-coding-agent";
 import type { AgentDefinition } from "../types.ts";
+
+let showDescription = true;
+
+/**
+ * Configure whether the active agent's description is shown in the status banner.
+ * Absent/undefined falls back to true, preserving the default behavior.
+ */
+export function setShowAgentDescription(value: boolean | undefined): void {
+  showDescription = value ?? true;
+}
 
 /**
  * Update the status widget to reflect the active agent.
@@ -20,7 +30,7 @@ export function updateBanner(
     const parts: string[] = [];
     parts.push(ui.theme.bold(ui.theme.fg("accent", activeAgent.name)));
 
-    if (activeAgent.description) {
+    if (showDescription && activeAgent.description) {
       parts.push(ui.theme.fg("muted", `— ${activeAgent.description}`));
     }
 

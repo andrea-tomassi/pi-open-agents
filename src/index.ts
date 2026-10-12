@@ -22,7 +22,7 @@ import type { AgentDefinition, ThinkingLevel } from "./types.ts";
 import { loadAgents, selectableAgents, spawnableAgents } from "./discovery/loader.ts";
 import { AgentManager } from "./primary/manager.ts";
 import { refreshAgentTools, buildSystemPrompt, buildSubagentGuidance } from "./primary/executor.ts";
-import { updateBanner } from "./tui/banner.ts";
+import { setShowAgentDescription, updateBanner } from "./tui/banner.ts";
 import { registerTuiControls } from "./tui/selector.ts";
 import { registerAgentTools } from "./tui/tools.ts";
 import { registerSubagentTool } from "./subagent/tool.ts";
@@ -33,6 +33,7 @@ import { allowedAgentNames, isSubagentProcess } from "./subagent/env.ts";
 interface Settings {
   defaultAgent?: string;
   defaultThinkingLevel?: ThinkingLevel;
+  showAgentDescription?: boolean;
 }
 
 function loadSettings(cwd: string): Settings {
@@ -74,6 +75,7 @@ export default function piOpenAgents(pi: ExtensionAPI): void {
   pi.on("session_start", async (event, ctx) => {
     // Load settings for thinking fallback
     const settings = loadSettings(ctx.cwd);
+    setShowAgentDescription(settings.showAgentDescription);
 
     // Load all agent definitions from discovery paths
     const result = await loadAgents({
