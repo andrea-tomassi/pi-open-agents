@@ -127,6 +127,7 @@ export default function piOpenAgents(pi: ExtensionAPI): void {
 
       if (agentEntry?.data?.name) {
         manager.restoreFromSession(agentEntry.data.name);
+        pi.appendEntry("active_agent", { name: agentEntry.data.name });
         // Re-apply tools on resume (model preserved from session)
         const active = manager.getActive();
         if (active) {

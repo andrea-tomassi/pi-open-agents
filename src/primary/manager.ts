@@ -69,6 +69,7 @@ export class AgentManager {
     this.active = agent;
 
     await applyAgentConfig(agent, pi, ctx);
+    pi.appendEntry("active_agent", { name });
 
     return true;
   }
@@ -93,6 +94,7 @@ export class AgentManager {
 
     this.activeName = undefined;
     this.active = undefined;
+    pi.appendEntry("active_agent", { name: null });
   }
 
   /**
