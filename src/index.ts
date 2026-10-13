@@ -107,7 +107,10 @@ export default function piOpenAgents(pi: ExtensionAPI): void {
       // return). Without this, the permission system would resolve the
       // parent's active_agent entry and attribute the parent's policy to the
       // child. Append an explicit terminator so the child falls back to the
-      // global policy — the pre-patch baseline.
+      // global policy — the pre-patch baseline. Falls back to the global policy
+      // because nothing has resolved an agent name yet in this process — the
+      // permission system caches the last name it resolved (knownAgentName) and
+      // does not clear it between sessions.
       pi.appendEntry("active_agent", { name: null });
       updateBanner(ctx.ui, undefined, 0);
       return;
@@ -150,7 +153,9 @@ export default function piOpenAgents(pi: ExtensionAPI): void {
           // newest one, and the consumer's backward scan would resolve it —
           // silently applying that (now disabled/unknown) agent's policy.
           // Append an explicit terminator so it stops here and falls back to
-          // the global policy.
+          // the global policy — nothing has resolved an agent name yet in this
+          // process, since the consumer caches the last name it resolved
+          // (knownAgentName) and does not clear it between sessions.
           pi.appendEntry("active_agent", { name: null });
         }
         updateBanner(ctx.ui, manager.getActive(), selectableAgents(manager.getAgents()).length);
