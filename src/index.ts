@@ -102,6 +102,13 @@ export default function piOpenAgents(pi: ExtensionAPI): void {
     // (--model, --system-prompt, --tools). Do NOT apply defaultAgent — it would
     // override the executor's model/tools/prompt settings.
     if (isSubagentProcess(process.env)) {
+      // A forked child inherits the parent's session entries (pi core copies
+      // them into the branched session) and never re-announces (this early
+      // return). Without this, the permission system would resolve the
+      // parent's active_agent entry and attribute the parent's policy to the
+      // child. Append an explicit terminator so the child falls back to the
+      // global policy — the pre-patch baseline.
+      pi.appendEntry("active_agent", { name: null });
       updateBanner(ctx.ui, undefined, 0);
       return;
     }
@@ -127,10 +134,15 @@ export default function piOpenAgents(pi: ExtensionAPI): void {
 
       if (agentEntry?.data?.name) {
         manager.restoreFromSession(agentEntry.data.name);
-        pi.appendEntry("active_agent", { name: agentEntry.data.name });
-        // Re-apply tools on resume (model preserved from session)
+        // Only announce the agent when the restore actually produced an active
+        // agent. restoreFromSession() silently no-ops on an unknown name
+        // (deleted, renamed, or disable:true — the loader skips those), and
+        // announcing one would make the permission system apply a disabled
+        // agent's policy to this session.
         const active = manager.getActive();
         if (active) {
+          pi.appendEntry("active_agent", { name: active.name });
+          // Re-apply tools on resume (model preserved from session)
           refreshAgentTools(active, pi);
         }
         updateBanner(ctx.ui, manager.getActive(), selectableAgents(manager.getAgents()).length);

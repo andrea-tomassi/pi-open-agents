@@ -94,6 +94,9 @@ export class AgentManager {
 
     this.activeName = undefined;
     this.active = undefined;
+    // The consumer treats a null-name entry as "stop scanning" and then falls
+    // back to its last known name, so clearing does not restore the global
+    // policy for a session that already resolved a non-null agent.
     pi.appendEntry("active_agent", { name: null });
   }
 
