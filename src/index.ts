@@ -144,6 +144,14 @@ export default function piOpenAgents(pi: ExtensionAPI): void {
           pi.appendEntry("active_agent", { name: active.name });
           // Re-apply tools on resume (model preserved from session)
           refreshAgentTools(active, pi);
+        } else {
+          // The restore no-op'd (see above), so no new entry was written. An
+          // older active_agent entry written by a previous apply() is still the
+          // newest one, and the consumer's backward scan would resolve it —
+          // silently applying that (now disabled/unknown) agent's policy.
+          // Append an explicit terminator so it stops here and falls back to
+          // the global policy.
+          pi.appendEntry("active_agent", { name: null });
         }
         updateBanner(ctx.ui, manager.getActive(), selectableAgents(manager.getAgents()).length);
         return;
