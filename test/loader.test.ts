@@ -271,3 +271,52 @@ Not an agent.`,
 
   assert.deepEqual(result.agents.map((a) => a.name), ["real"]);
 });
+
+test("loader: pi-family global beats opencode-family global by name", async () => {
+  const fs = makeMockFs({
+    "/pi-global/orchestrator.md": "---\nname: orchestrator\ndescription: pi copy\nmode: primary\n---\npi body",
+    "/oc-config/agents/orchestrator.md": "---\ndescription: opencode copy\nmode: primary\n---\nopencode body",
+  });
+  const result = await loadAgents({
+    fs,
+    paths: [
+      { dir: "/pi-global", source: "global", family: "pi", subdirs: [""] },
+      { dir: "/oc-config", source: "global", family: "opencode", subdirs: ["agents"] },
+    ],
+  });
+  const oc = result.agents.find((a) => a.name === "orchestrator");
+  assert.ok(oc, "orchestrator must load");
+  assert.equal(oc.filePath, "/pi-global/orchestrator.md");
+  assert.equal(oc.description, "pi copy");
+});
+
+test("loader: project opencode still overrides pi global", async () => {
+  const fs = makeMockFs({
+    "/pi-global/shared.md": "---\nname: shared\ndescription: pi global\nmode: primary\n---\npi",
+    "/oc-proj/agents/shared.md": "---\ndescription: project oc\nmode: primary\n---\noc",
+  });
+  const result = await loadAgents({
+    fs,
+    paths: [
+      { dir: "/pi-global", source: "global", family: "pi", subdirs: [""] },
+      { dir: "/oc-proj", source: "project", family: "opencode", subdirs: ["agents"] },
+    ],
+  });
+  const a = result.agents.find((x) => x.name === "shared");
+  assert.equal(a?.filePath, "/oc-proj/agents/shared.md");
+});
+
+test("loader: same-family globals keep last-scan-wins", async () => {
+  const fs = makeMockFs({
+    "/oc-a/agents/dup.md": "---\ndescription: first\nmode: primary\n---\n1",
+    "/oc-b/agents/dup.md": "---\ndescription: second\nmode: primary\n---\n2",
+  });
+  const result = await loadAgents({
+    fs,
+    paths: [
+      { dir: "/oc-a", source: "global", family: "opencode", subdirs: ["agents"] },
+      { dir: "/oc-b", source: "global", family: "opencode", subdirs: ["agents"] },
+    ],
+  });
+  assert.equal(result.agents.find((x) => x.name === "dup")?.description, "second");
+});

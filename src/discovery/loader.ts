@@ -92,6 +92,9 @@ export async function loadAgents(options: LoadAgentsOptions = {}): Promise<Agent
   const projectAgents = new Map<string, AgentDefinition>();
   const warnings: AgentLoadResult["warnings"] = [];
 
+  const GLOBAL_FAMILY_RANK: Record<string, number> = { pi: 2, opencode: 1, shared: 1 };
+  const globalRanks = new Map<string, number>();
+
   for (const discPath of paths) {
     // For each subdir pattern, scan the directory
     for (const subdir of discPath.subdirs) {
@@ -113,8 +116,16 @@ export async function loadAgents(options: LoadAgentsOptions = {}): Promise<Agent
           if (agent.disable) continue;
 
           // Add to the appropriate map
-          const target = discPath.source === "project" ? projectAgents : globalAgents;
-          target.set(agent.name, agent);
+          if (discPath.source === "project") {
+            projectAgents.set(agent.name, agent);
+          } else {
+            const rank = GLOBAL_FAMILY_RANK[discPath.family] ?? 0;
+            const prevRank = globalRanks.get(agent.name);
+            if (prevRank === undefined || rank >= prevRank) {
+              globalAgents.set(agent.name, agent);
+              globalRanks.set(agent.name, rank);
+            }
+          }
         } catch (error) {
           warnings.push({
             filePath,
