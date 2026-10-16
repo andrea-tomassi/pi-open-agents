@@ -194,3 +194,32 @@ run("model override: malformed model rejected without spawning", async () => {
   );
   assert.equal(captured.calls, 0, "runner must not be called on validation failure");
 });
+
+// ─── Issue #16: aggregator model ids (slashes inside the model id) ────────────
+
+run("model override #16: multi-slash aggregator id accepted and propagated", async () => {
+  const captured: { modelOverride?: string; calls: number } = { calls: 0 };
+  const tool = registerAndGetTool(baseAgent, captured);
+  await tool.execute(
+    "call-4",
+    { agent: "worker", task: "hi", model: "openrouter/anthropic/claude-opus-5.5" },
+    undefined,
+    undefined,
+    CTX,
+  );
+  assert.equal(captured.modelOverride, "openrouter/anthropic/claude-opus-5.5");
+});
+
+run("model override #16: invalid specs rejected without spawning", async () => {
+  const invalid = ["provider/", "/model", "a /b", "a/ b", " /model", "provider/ "];
+  for (const spec of invalid) {
+    const captured: { modelOverride?: string; calls: number } = { calls: 0 };
+    const tool = registerAndGetTool(baseAgent, captured);
+    await assert.rejects(
+      () => tool.execute("call-5", { agent: "worker", task: "hi", model: spec }, undefined, undefined, CTX),
+      /Invalid model/,
+      `"${spec}" must be rejected`,
+    );
+    assert.equal(captured.calls, 0, `runner must not be called for "${spec}"`);
+  }
+});

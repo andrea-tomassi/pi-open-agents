@@ -66,6 +66,18 @@ function availableAgentsText(agents: AgentDefinition[]): string {
   );
 }
 
+/**
+ * Validate a per-call model spec: "provider/model-id".
+ *
+ * The model id may itself contain slashes — aggregator providers use
+ * `vendor/model` ids (e.g. "openrouter/anthropic/claude-opus-5.5"), so the
+ * split is on the FIRST slash and only the separator is validated.
+ */
+function isValidModelSpec(spec: string): boolean {
+  const slash = spec.indexOf("/");
+  return slash > 0 && slash < spec.length - 1 && !/\s/.test(spec);
+}
+
 function toToolResult(result: AgentResult) {
   return {
     content: [{ type: "text" as const, text: result.output || "(no output)" }],
@@ -213,7 +225,7 @@ export function registerSubagentTool(
       ),
       model: Type.Optional(
         Type.String({
-          description: 'Per-call model override in "provider/model-id" format (e.g. "anthropic/claude-sonnet-4-5"). Takes precedence over the agent definition default.',
+          description: 'Per-call model override in "provider/model-id" format (e.g. "anthropic/claude-sonnet-4-5"). Model ids may contain slashes for aggregator providers ("openrouter/anthropic/claude-opus-5.5"). Takes precedence over the agent definition default.',
         }),
       ),
     }),
@@ -244,9 +256,9 @@ export function registerSubagentTool(
 
       const childCwd = params.cwd ?? ctx.cwd;
 
-      if (params.model !== undefined && !/^[^/\s]+\/[^/\s]+$/.test(params.model)) {
+      if (params.model !== undefined && !isValidModelSpec(params.model)) {
         throw new Error(
-          `Invalid model "${params.model}": expected "provider/model-id" format (e.g. "anthropic/claude-sonnet-4-5").`,
+          `Invalid model "${params.model}": expected "provider/model-id" format (e.g. "anthropic/claude-sonnet-4-5" or "openrouter/anthropic/claude-opus-5.5").`,
         );
       }
 

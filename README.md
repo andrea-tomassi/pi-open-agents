@@ -175,6 +175,8 @@ This means:
 single call — `subagent({ agent: "deep-research", task: "...", model: "zai/glm-5.3-flash" })`.
 Handy for "run this one task on the cheap model" without forking an agent
 definition. Malformed values (`no-slash`) are rejected before any spawn.
+Aggregator providers work too — the model id may contain slashes:
+`model: "openrouter/anthropic/claude-opus-5.5"`.
 
 The `--tools` whitelist is derived from both explicit `tools:` arrays and
 permission allow-lists. An agent with `permission: { read: allow, edit: allow }`
