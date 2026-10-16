@@ -29,8 +29,9 @@ import { toolToPermission } from "./evaluator.ts";
  * Rules from nested objects are expanded with their pattern.
  * Simple string values get pattern "*".
  *
- * Permission keys are normalized via toolToPermission (write → edit, etc.)
- * so that both "write: deny" and "edit: deny" affect the edit tool.
+ * Permission keys are normalized via toolToPermission (apply_patch → edit,
+ * mcp read tools → read). In pi, `write` and `edit` are separate tools and
+ * stay separate permission categories (see evaluator.ts).
  *
  * Order is preserved as written (object key order).
  */

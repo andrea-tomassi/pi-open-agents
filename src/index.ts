@@ -27,6 +27,7 @@ import { registerTuiControls } from "./tui/selector.ts";
 import { registerAgentTools } from "./tui/tools.ts";
 import { registerSubagentTool } from "./subagent/tool.ts";
 import { allowedAgentNames, isSubagentProcess } from "./subagent/env.ts";
+import { registerPermissionGate } from "./permission/gate.ts";
 
 // ─── Settings ────────────────────────────────────────────────────────────────
 
@@ -96,6 +97,18 @@ export default function piOpenAgents(pi: ExtensionAPI): void {
       agents: result.agents,
       agentDir: getAgentDir(),
       getActiveAgent: () => manager.getActive(),
+    });
+
+    // Runtime permission gate: enforces allow/deny/ask on every tool call
+    // (argument-aware patterns + interactive ask; fail-closed in subagents).
+    registerPermissionGate(pi, {
+      resolveAgent: () => {
+        // In subagent children the active agent is not applied (the executor
+        // configures them via CLI flags) — resolve by the env var it passes.
+        const childName = process.env.PI_OPEN_AGENTS_NAME;
+        if (childName) return manager.getAgent(childName);
+        return manager.getActive();
+      },
     });
 
     // Subagent child processes are fully configured by the executor via CLI flags

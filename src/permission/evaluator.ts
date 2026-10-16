@@ -112,7 +112,7 @@ export function evaluate(
  * "*" matches anything
  * "edit" matches "e*" (not typical, but supported)
  */
-function matchPermissionKey(rulePermission: string, toolPermission: string): boolean {
+export function matchPermissionKey(rulePermission: string, toolPermission: string): boolean {
   if (rulePermission === "*") return true;
   return matchPattern(rulePermission, toolPermission);
 }

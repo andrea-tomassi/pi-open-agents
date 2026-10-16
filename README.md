@@ -147,6 +147,26 @@ Tool names are normalized automatically: `task` → `subagent`, `vscode` → `re
 **separate** tools — `write` creates/overwrites files, `edit` does search-and-
 replace — so they have separate permission categories.
 
+**Runtime enforcement (v0.1.24).** Every tool call is evaluated against the
+active agent's rules *before it runs* — not just used to filter the toolset:
+
+- `deny` blocks the call; the model receives a clear denial reason
+- `ask` opens a dialog: *Allow once / Allow always (this session) / Deny*
+- Patterns are **argument-aware**: file paths for `read`/`edit`/`write`,
+  command strings for `bash` (`"rm -rf *": deny`, `"**/*.env": deny` — `*`
+  doesn't cross `/`, use `**` for nested paths)
+- Rules are evaluated top-to-bottom, **last match wins** — put specific rules
+  *after* catch-alls (`"*": ask` first, then `"git *": allow`)
+- A call matching no pattern within a configured category proceeds (rule lists
+  are deny/ask lists, not exhaustive allowlists)
+
+> **⚠️ Migration note (v0.1.24):** `ask` is now enforced — previously it was
+> parsed but silently ignored. In non-interactive processes (subagent
+> children, print/JSON mode) an `ask` rule **blocks** the call (fail-closed):
+> add an explicit `allow` rule if a subagent needs that tool. `deny` now also
+> blocks matching *individual calls* (patterns included), not just statically
+> hiding whole tools. (#20)
+
 ### Auto-injected delegation guidance
 
 If an agent has the `subagent` tool, the plugin automatically appends a
