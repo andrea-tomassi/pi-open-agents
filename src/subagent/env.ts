@@ -19,6 +19,7 @@ export type RecursionEnv = Partial<
     | "PI_OPEN_AGENTS_SYSTEM_PROMPT_MODE"
     | "PI_OPEN_AGENTS_ALLOWED"
     | "PI_OPEN_AGENTS_SESSION"
+    | "PI_OPEN_AGENTS_PARENT_RULES"
     | "PI_OPEN_AGENTS_DEBUG",
     string
   >
@@ -66,6 +67,35 @@ export function isSubagentProcess(env: RecursionEnv): boolean {
 }
 
 /**
+ * Get the parent's inherited deny/ask rules from env (issue #8).
+ *
+ * The delegating parent serializes the restrictive subset of its permission
+ * rules (deny/ask, pattern-level included) as JSON. The child's permission
+ * gate appends them after its own rules (last-match-wins → parent wins).
+ * Malformed or absent → no inheritance (empty list).
+ */
+export function parentInheritedRules(
+  env: RecursionEnv,
+): Array<{ permission: string; pattern: string; action: "deny" | "ask" }> {
+  const raw = env?.PI_OPEN_AGENTS_PARENT_RULES;
+  if (!raw) return [];
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (r): r is { permission: string; pattern: string; action: "deny" | "ask" } =>
+        typeof r === "object" &&
+        r !== null &&
+        typeof (r as any).permission === "string" &&
+        typeof (r as any).pattern === "string" &&
+        ((r as any).action === "deny" || (r as any).action === "ask"),
+    );
+  } catch {
+    return [];
+  }
+}
+
+/**
  * Get the system prompt mode from env.
  */
 export function getSystemPromptMode(env: RecursionEnv): SystemPromptMode | undefined {
@@ -91,6 +121,7 @@ export interface SubagentEnvVars {
   systemPromptMode: SystemPromptMode;
   session: "none" | "fork";
   allowedAgents?: string[];
+  parentRules?: string;
   debug: boolean;
 }
 
@@ -109,6 +140,10 @@ export function buildSubagentEnv(vars: SubagentEnvVars): Record<string, string> 
 
   if (vars.allowedAgents && vars.allowedAgents.length > 0) {
     env.PI_OPEN_AGENTS_ALLOWED = vars.allowedAgents.join(",");
+  }
+
+  if (vars.parentRules) {
+    env.PI_OPEN_AGENTS_PARENT_RULES = vars.parentRules;
   }
 
   return env;

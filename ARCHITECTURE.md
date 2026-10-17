@@ -104,10 +104,28 @@ The `tools` field is kept as a fallback: if no `permission` is specified but
 
 The permission engine is shared between both execution paths:
 
-- **Primary agent**: filter available tools at apply time; evaluate before
-  each tool call (allow = proceed, deny = reject, ask = prompt user)
-- **Subagent**: inherit parent's deny rules + apply agent's own rules;
-  passed to child process via environment variables
+- **Primary agent**: filter available tools at apply time (blanket `deny`
+  hides a builtin before the model sees it); evaluate before **every tool
+  call** via the runtime gate (`permission/gate.ts`, hooked on pi's
+  `tool_call` event): allow = proceed, deny = block with a model-visible
+  reason, ask = prompt the user (Allow once / Always this session / Deny)
+- **Subagent**: the parent's authority ceiling is handed down at delegation
+  time (issue #8, design by @Silentpartnercoding):
+  1. **Tool level** — the parent's live active set (`pi.getActiveTools()`)
+     is snapshotted and stripped of tools blanket-denied *or* blanket-`ask`
+     (`ask` is not authority: a headless child has no approval bridge).
+     The child's own representable whitelist is intersected with it and
+     passed via `--tools`; an empty intersection becomes `--no-tools`
+     (omitting the flag would mean ALL tools — fail-open).
+  2. **Argument-pattern level** — the parent's restrictive rules
+     (`deny`/`ask`, patterns included) are serialized as JSON into
+     `PI_OPEN_AGENTS_PARENT_RULES`; the child's gate appends them **after**
+     its own rules, so last-match-wins makes the inherited verdict
+     un-widenable.
+  3. **Transitive** — the child's CLI ceiling becomes its `getActiveTools()`,
+     so a grandchild cannot regain any tool removed at an earlier hop.
+     Hosts without `getActiveTools` simply skip the ceiling (own rules still
+     enforce).
 
 ### 5. Separate execution, shared definition
 
@@ -199,7 +217,8 @@ src/
 ├── permission/
 │   ├── parser.ts                # PermissionConfig → PermissionRule[]
 │   ├── matcher.ts               # Glob/wildcard pattern matching
-│   └── evaluator.ts             # Last-match-wins evaluation → allow|deny|ask
+│   ├── evaluator.ts             # Last-match-wins evaluation → allow|deny|ask
+│   └── gate.ts                  # Runtime tool_call enforcement + inherited rules
 │
 ├── primary/
 │   ├── manager.ts               # Active agent state, applyAgent / restoreDefault

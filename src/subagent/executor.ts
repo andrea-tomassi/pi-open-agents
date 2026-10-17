@@ -116,6 +116,17 @@ export interface RunSubagentOptions {
   session?: SubagentSessionInfo;
   /** Per-call model override ("provider/model-id"). Takes precedence over agent.model. */
   modelOverride?: string;
+  /**
+   * Parent's effective tool authority at delegation time (issue #8).
+   * The child's representable toolset is intersected with it; the result
+   * travels to the grandchild through pi's own active set (CLI ceiling),
+   * so authority can only shrink along the delegation chain.
+   * Undefined = no ceiling (unrestricted parent or host without
+   * getActiveTools). Empty array = hard zero-tool ceiling.
+   */
+  parentCeiling?: string[];
+  /** Parent's restrictive (deny/ask) permission rules, inherited into the child's gate via env. */
+  parentRules?: Array<{ permission: string; pattern: string; action: "deny" | "ask" }>;
   resolvePi?: () => Promise<PiResolution> | PiResolution;
   runner?: ProcessRunner;
   fs?: ExecutorFs;
@@ -183,6 +194,26 @@ function deriveToolsWhitelist(agent: AgentDefinition): string[] | undefined {
 
 function emptyUsage(): AgentUsage {
   return { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0, contextTokens: 0 };
+}
+
+/**
+ * Compose the child's `--tools` value under the parent ceiling (#8).
+ *
+ * - No ceiling → child's own whitelist as-is (undefined when unrestricted).
+ * - Ceiling + own whitelist → own ∩ ceiling, preserving own's order.
+ * - Ceiling only (child unrestricted) → the ceiling itself.
+ * - Empty result → "none": the caller must pass `--no-tools` — omitting
+ *   `--tools` would mean ALL tools and fail open.
+ */
+export function composeChildTools(
+  own: string[] | undefined,
+  ceiling: string[] | undefined,
+): string[] | "none" | undefined {
+  if (ceiling === undefined) return own && own.length > 0 ? own : undefined;
+  const base = own ?? ceiling;
+  const allowed = new Set(ceiling);
+  const result = base.filter((t) => allowed.has(t));
+  return result.length > 0 ? result : "none";
 }
 
 export function subagentSessionDir(
@@ -533,10 +564,12 @@ export async function runSubagent(options: RunSubagentOptions): Promise<AgentRes
     // Thinking level
     args.push("--thinking", options.agent.thinking);
 
-    // Tools whitelist
-    const toolsWhitelist = deriveToolsWhitelist(options.agent);
-    if (toolsWhitelist && toolsWhitelist.length > 0) {
-      args.push("--tools", toolsWhitelist.join(","));
+    // Tools whitelist, intersected with the parent's ceiling (#8)
+    const childTools = composeChildTools(deriveToolsWhitelist(options.agent), options.parentCeiling);
+    if (childTools === "none") {
+      args.push("--no-tools");
+    } else if (childTools) {
+      args.push("--tools", childTools.join(","));
     }
 
     // System prompt file (append or replace)
@@ -564,6 +597,9 @@ export async function runSubagent(options: RunSubagentOptions): Promise<AgentRes
       systemPromptMode: options.agent.systemPrompt,
       session: options.session?.effective ?? "none",
       allowedAgents: availableSubagentsForAgent(options.agent, options.availableAgents),
+      parentRules: options.parentRules && options.parentRules.length > 0
+        ? JSON.stringify(options.parentRules)
+        : undefined,
       debug: false,
     };
     const childEnv: NodeJS.ProcessEnv = {

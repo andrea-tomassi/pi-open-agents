@@ -21,8 +21,10 @@ import { getMarkdownTheme, keyHint } from "@earendil-works/pi-coding-agent";
 import { Container, Markdown, Spacer, Text } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 
-import type { AgentDefinition } from "../types.ts";
+import type { AgentDefinition, PermissionRule } from "../types.ts";
 import { spawnableAgents } from "../discovery/loader.ts";
+import { matchPermissionKey, toolToPermission } from "../permission/evaluator.ts";
+import { parsePermissionRules } from "../permission/parser.ts";
 import {
   availableSubagentsForAgent,
   resolveSubagentSession,
@@ -37,7 +39,12 @@ import {
   formatResultLines,
   formatUsage,
 } from "./render.ts";
-import { allowedAgentNames, isPastMaxDepth, type RecursionEnv } from "./env.ts";
+import {
+  allowedAgentNames,
+  isPastMaxDepth,
+  parentInheritedRules,
+  type RecursionEnv,
+} from "./env.ts";
 import { preview, shortenPath, stringArg } from "../utils/format.ts";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -76,6 +83,66 @@ function availableAgentsText(agents: AgentDefinition[]): string {
 function isValidModelSpec(spec: string): boolean {
   const slash = spec.indexOf("/");
   return slash > 0 && slash < spec.length - 1 && !/\s/.test(spec);
+}
+
+// ─── Permission Inheritance (#8) ─────────────────────────────────────────────
+
+type InheritedRule = { permission: string; pattern: string; action: "deny" | "ask" };
+
+function isRestrictive(
+  rule: PermissionRule,
+): rule is PermissionRule & { action: "deny" | "ask" } {
+  return rule.action === "deny" || rule.action === "ask";
+}
+
+/**
+ * Compute the parent's effective tool ceiling at delegation time (#8).
+ *
+ * Base = pi's live active set (the authority snapshot the child cannot
+ * exceed — and, in a child process, what the child's own delegates will
+ * see: the ceiling composes transitively down the chain). Tools the
+ * parent's own rules deny or ask over are REMOVED from the ceiling: `ask`
+ * is not authority — a headless child has no approval bridge, and an
+ * ask-only tool must not become a silently usable one down the chain.
+ *
+ * Returns undefined when the host exposes no active-set API (then no
+ * ceiling is applied and behavior matches pre-#8).
+ */
+export function computeDelegationCeiling(
+  activeTools: string[] | undefined,
+  rules: PermissionRule[],
+): string[] | undefined {
+  if (activeTools === undefined) return undefined;
+  const blanket = rules.filter(
+    (r) => r.pattern === "*" && (r.action === "deny" || r.action === "ask"),
+  );
+  return activeTools.filter((toolName) => {
+    const category = toolToPermission(toolName);
+    return !blanket.some((r) => matchPermissionKey(r.permission, category));
+  });
+}
+
+/**
+ * The restrictive rule set to hand to the child's gate (#8): the parent's
+ * own deny/ask rules PLUS rules inherited further up the chain (so
+ * patterns survive every hop). Deduped; later (own) entries win on overlap
+ * via last-match-wins — both are restrictive, so ordering only affects
+ * identical-pattern conflicts.
+ */
+export function composeInheritedRules(
+  own: PermissionRule[],
+  fromEnv: InheritedRule[],
+): InheritedRule[] {
+  const restrictiveOwn: InheritedRule[] = own.filter(isRestrictive);
+  const seen = new Set<string>();
+  const out: InheritedRule[] = [];
+  for (const rule of [...fromEnv, ...restrictiveOwn]) {
+    const key = `${rule.permission}\u0000${rule.pattern}\u0000${rule.action}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(rule);
+  }
+  return out;
 }
 
 function toToolResult(result: AgentResult) {
@@ -270,6 +337,15 @@ export function registerSubagentTool(
         options.agentDir,
       );
 
+      // Permission inheritance (#8): snapshot the parent's live authority,
+      // strip blanket deny/ask tools, and carry restrictive patterns (own +
+      // inherited) into the child's gate via env.
+      const getActive = (pi as { getActiveTools?: () => string[] }).getActiveTools;
+      const activeTools = typeof getActive === "function" ? getActive.call(pi) : undefined;
+      const ownRules = activeAgent?.permission ? parsePermissionRules(activeAgent.permission) : [];
+      const parentCeiling = computeDelegationCeiling(activeTools, ownRules.filter(isRestrictive));
+      const parentRules = composeInheritedRules(ownRules, parentInheritedRules(env));
+
       const result = await runner({
         agent,
         task: params.task,
@@ -280,6 +356,8 @@ export function registerSubagentTool(
         agentDir: options.agentDir,
         session,
         modelOverride: params.model,
+        parentCeiling,
+        parentRules: parentRules.length > 0 ? parentRules : undefined,
         onProgress: (progress) => onUpdate?.(toProgressResult(progress)),
       });
 

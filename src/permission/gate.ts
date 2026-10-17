@@ -140,22 +140,32 @@ export interface PermissionGateOptions {
   resolveAgent: () => AgentDefinition | undefined;
   /** Session-scoped "always allow" memo (per process). Injectable for tests. */
   alwaysAllow?: Map<string, boolean>;
+  /**
+   * Rules inherited from the delegating parent (#8). Appended AFTER the
+   * agent's own rules — last-match-wins, so an inherited deny/ask always
+   * beats the child's own allow for the same call (authority ceiling).
+   */
+  inheritedRules?: () => PermissionRule[];
 }
 
 /**
  * Register the permission gate on the `tool_call` event.
  *
- * Does nothing for agents without permission rules.
+ * Does nothing when neither the agent nor the chain contributes rules.
  */
 export function registerPermissionGate(pi: ExtensionAPI, options: PermissionGateOptions): void {
   const alwaysAllow = options.alwaysAllow ?? new Map<string, boolean>();
 
   pi.on("tool_call", async (event, ctx: ExtensionContext) => {
     const agent = options.resolveAgent();
-    if (!agent?.permission) return undefined;
+    const ownRules = agent?.permission ? parsePermissionRules(agent.permission) : [];
+    const inherited = options.inheritedRules?.() ?? [];
+    if (ownRules.length === 0 && inherited.length === 0) return undefined;
 
     const input = (event as { input?: Record<string, unknown> }).input ?? {};
-    const rules = parsePermissionRules(agent.permission);
+    // Parent rules last: last-match-wins makes an inherited deny/ask beat
+    // the child's own allow — the authority ceiling cannot be widened (#8).
+    const rules = [...ownRules, ...inherited];
     const decision = decideToolCall(event.toolName, input, rules);
 
     if (!decision.gated || decision.action === "allow") return undefined;

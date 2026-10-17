@@ -39,7 +39,10 @@ function agentWith(permission: NonNullable<AgentDefinition["permission"]>): Agen
 
 type Handler = (event: { toolName: string; input?: Record<string, unknown> }, ctx: unknown) => Promise<unknown>;
 
-function captureHandler(resolveAgent: () => AgentDefinition | undefined): {
+function captureHandler(
+  resolveAgent: () => AgentDefinition | undefined,
+  inheritedRules?: () => import("../src/types.ts").PermissionRule[],
+): {
   handler: Handler;
   alwaysAllow: Map<string, boolean>;
 } {
@@ -51,7 +54,7 @@ function captureHandler(resolveAgent: () => AgentDefinition | undefined): {
     },
   };
   const alwaysAllow = new Map<string, boolean>();
-  registerPermissionGate(pi as never, { resolveAgent, alwaysAllow });
+  registerPermissionGate(pi as never, { resolveAgent, alwaysAllow, inheritedRules });
   assert.ok(handler, "tool_call handler must be registered");
   return { handler, alwaysAllow };
 }
@@ -148,12 +151,28 @@ const RULES = { bash: "ask" } as const;
 type PermissionConfigLike = NonNullable<AgentDefinition["permission"]>;
 const askAgent = agentWith(RULES as PermissionConfigLike);
 
-test("gate handler: no permission config → not blocked, no dialog", async () => {
+test("gate handler: no permission config and no inherited rules → not blocked, no dialog", async () => {
   const { handler } = captureHandler(() => baseAgent);
   const { ctx, calls } = fakeCtx(true, "Allow once");
   const result = await handler({ toolName: "bash", input: { command: "rm -rf /" } }, ctx);
   assert.equal(result, undefined);
   assert.equal(calls.length, 0);
+});
+
+test("gate handler: child WITHOUT own permissions still enforces inherited deny (#8)", async () => {
+  const { handler } = captureHandler(
+    () => baseAgent, // no permission field
+    () => [{ permission: "write", pattern: "**/*.env", action: "deny" }],
+  );
+  const { ctx } = fakeCtx(false);
+  const blocked = (await handler({ toolName: "write", input: { file_path: "/p/x.env" } }, ctx)) as {
+    block: boolean;
+    reason: string;
+  };
+  assert.equal(blocked.block, true);
+  assert.match(blocked.reason, /Permission denied/);
+  const passed = await handler({ toolName: "write", input: { file_path: "/p/x.txt" } }, ctx);
+  assert.equal(passed, undefined);
 });
 
 test("gate handler: deny rule blocks with model-visible reason", async () => {

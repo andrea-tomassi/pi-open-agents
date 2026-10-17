@@ -26,7 +26,7 @@ import { setShowAgentDescription, updateBanner } from "./tui/banner.ts";
 import { registerTuiControls } from "./tui/selector.ts";
 import { registerAgentTools } from "./tui/tools.ts";
 import { registerSubagentTool } from "./subagent/tool.ts";
-import { allowedAgentNames, isSubagentProcess } from "./subagent/env.ts";
+import { allowedAgentNames, isSubagentProcess, parentInheritedRules } from "./subagent/env.ts";
 import { registerPermissionGate } from "./permission/gate.ts";
 
 // ─── Settings ────────────────────────────────────────────────────────────────
@@ -111,6 +111,8 @@ export default function piOpenAgents(pi: ExtensionAPI): void {
         if (childName) return manager.getAgent(childName);
         return manager.getActive();
       },
+      // #8: restrictive rules handed down by the delegating parent (env JSON).
+      inheritedRules: () => parentInheritedRules(process.env),
     });
 
     // Subagent child processes are fully configured by the executor via CLI flags

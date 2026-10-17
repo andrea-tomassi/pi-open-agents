@@ -93,7 +93,7 @@ here — or native in pi itself:
 |---|---|
 | `AGENTS.md` adoption — anthropics/claude-code#31005 👍336, openai/codex#12115 👍109 | ✅ Native in pi: `AGENTS.md`/`CLAUDE.md` discovery with `AGENTS.override.md` layering |
 | Agent Skills standard (`.agents/skills/`) — agentskills/agentskills#15 👍183 | ✅ Native in pi; shared agents from `.agents/` (#7 aligns to the dotagents layout) |
-| Tool restrictions that actually reach subagents — anthropics/claude-code#18950 👍70 | ✅ Since v0.1.14, `tools:`/`permission:` restrict the child toolset via `--tools` (full parent inheritance → #8) |
+| Tool restrictions that actually reach subagents — anthropics/claude-code#18950 👍70 | ✅ Since v0.1.14 via `--tools`; full **deny/ask inheritance** (effective-set ceiling + arg patterns) since v0.1.27 |
 | Model selection per subagent / per call — sst/opencode#6651 👍71 | ✅ Per-agent `model:` + per-call `model:` override in `subagent()` (since v0.1.19) |
 | Reasoning effort per agent — Kilo-Org/kilocode#13105 👍8 | ✅ `thinking: off…xhigh` per agent, forwarded to the child process |
 | Delegation guards — Kilo-Org/kilocode#9985 | ✅ `allowedAgents` allowlist + `maxDepth` recursion limit |
@@ -166,6 +166,31 @@ active agent's rules *before it runs* — not just used to filter the toolset:
 > add an explicit `allow` rule if a subagent needs that tool. `deny` now also
 > blocks matching *individual calls* (patterns included), not just statically
 > hiding whole tools. (#20)
+
+**Inheritance down the delegation chain (#8).** A subagent can never exceed
+the authority of the agent that delegated to it — in both directions of the
+rule language:
+
+- **Tool ceiling:** at delegation the parent's *live* tool set is snapshotted
+  (`pi.getActiveTools()`), minus tools it blanket-`deny`s or blanket-`ask`s
+  (`ask` is not authority: headless children have no approval bridge). The
+  child's own whitelist is intersected with that ceiling and passed via
+  `--tools` — an empty intersection becomes `--no-tools`, never "all tools".
+- **Argument patterns:** the parent's `deny`/`ask` rules (patterns included)
+  travel to the child's gate and are evaluated *last*, so the child cannot
+  widen them (`write: {"**/*.env": deny}` upstream blocks `.env` writes two
+  levels deep, whatever the child declares).
+- **Transitive:** the ceiling the child launches with *is* the child's active
+  set — a grandchild cannot regain any tool removed at an earlier hop.
+
+### Iterating on agents: `/reload`
+
+Edit a `.agent.md` file (or add/remove one) and run pi's built-in **`/reload`**
+— no session restart (#9). Agent definitions are re-discovered, the active
+agent is **kept** (your mid-session switch survives; `--agent` is a
+startup-only default), and a deleted/disabled active agent falls back cleanly
+with a warning. New agents appear in `/agents` and the `subagent` tool list
+immediately.
 
 ### Auto-injected delegation guidance
 
@@ -359,8 +384,8 @@ six sessions, zero chaos: that's the exact workstation setup documented in
 
 ## Roadmap
 
-- **Parent permission inheritance** for subagents — #8
-- **Agent hot-reload** (or `/reload-agents`) — #9
+- ~~**Parent permission inheritance** for subagents~~ — ✅ shipped in [0.1.27](https://github.com/andrea-tomassi/pi-open-agents/releases/tag/v0.1.27) (#8)
+- ~~**Agent hot-reload**~~ — ✅ works via pi's built-in `/reload`, shipped in [0.1.27](https://github.com/andrea-tomassi/pi-open-agents/releases/tag/v0.1.27) (#9)
 - ~~**Per-call model override** in `subagent()`~~ — ✅ shipped in [0.1.19](https://github.com/andrea-tomassi/pi-open-agents/releases/tag/v0.1.19) (#10)
 - **Parallel subagent limit** — #11
 
@@ -373,7 +398,7 @@ opening an issue or pull request.
 
 ```bash
 npm install
-npm test          # 117 tests
+npm test          # 178 tests
 npm run typecheck # tsc --noEmit
 ```
 
