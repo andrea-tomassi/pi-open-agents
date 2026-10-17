@@ -131,9 +131,11 @@ export default function piOpenAgents(pi: ExtensionAPI): void {
       return;
     }
 
-    // Check for --agent CLI flag first (highest priority)
+    // Check for --agent CLI flag first (highest priority at startup).
+    // Skipped on reload: the flag is a startup default — a mid-session agent
+    // switch must survive /reload, so the session entry below wins instead.
     const agentFlag = pi.getFlag("agent");
-    if (typeof agentFlag === "string" && agentFlag) {
+    if (typeof agentFlag === "string" && agentFlag && event.reason !== "reload") {
       const agent = manager.getAgent(agentFlag);
       if (agent) {
         await manager.apply(agentFlag, pi, ctx);
@@ -142,8 +144,9 @@ export default function piOpenAgents(pi: ExtensionAPI): void {
       return;
     }
 
-    // Try to restore from session state (if resuming)
-    if (event.reason === "resume" || event.reason === "fork") {
+    // Restore from session state (resume, fork, or /reload — all must keep
+    // the agent the session was actually using, not re-apply startup defaults)
+    if (event.reason === "resume" || event.reason === "fork" || event.reason === "reload") {
       const entries = ctx.sessionManager.getEntries();
       const agentEntry = entries
         .filter((e: { type: string; customType?: string }) =>
