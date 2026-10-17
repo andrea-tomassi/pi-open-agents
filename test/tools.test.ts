@@ -273,6 +273,7 @@ function makeApplyHost(): {
     ],
     setThinkingLevel: (_level: string): void => {},
     setActiveTools: (_names: string[]): void => {},
+    appendEntry: (_customType: string, _data: unknown): void => {},
   };
   const ctx = {
     model: undefined,
