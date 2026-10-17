@@ -191,6 +191,12 @@ This means:
 - Each subagent runs with exactly the model and tools it declares
 - Skills load per-agent, with wildcard support (`security-*`, `git-*`)
 
+> **`skills:` is subagent-only (#19).** pi discovers skills once at session
+> startup and exposes no per-agent filter, so a **primary** cannot role-scope
+> them. Declaring `skills:` on a primary (or `all`) agent warns on apply and
+> the field is ignored; the subagent child receives exactly its listed skills,
+> injected into its system prompt.
+
 **Per-call model override:** the caller can override the agent's default for a
 single call — `subagent({ agent: "deep-research", task: "...", model: "zai/glm-5.3-flash" })`.
 Handy for "run this one task on the cheap model" without forking an agent

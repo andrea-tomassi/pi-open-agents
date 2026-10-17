@@ -5,10 +5,27 @@
  * and coordinates with the executor for model/thinking/tools/prompt.
  */
 
-import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext, ExtensionUIContext } from "@earendil-works/pi-coding-agent";
 import type { Model } from "@earendil-works/pi-ai";
 import type { AgentDefinition, ThinkingLevel } from "../types.ts";
 import { applyAgentConfig } from "./executor.ts";
+
+/**
+ * Warn when an agent that will act as PRIMARY declares `skills:`.
+ *
+ * `skills:` is honored only for subagent children (the executor injects them
+ * into the child's system prompt). pi loads session skills at startup and
+ * exposes no per-agent filter, so a primary cannot role-scope them — warn
+ * instead of silently ignoring (#19).
+ */
+export function warnAgentSkillsPrimary(agent: AgentDefinition | undefined, ui: ExtensionUIContext): void {
+  if (agent?.skills && agent.skills.length > 0 && agent.mode !== "subagent") {
+    ui.notify(
+      `Agent "${agent.name}": skills: (${agent.skills.join(", ")}) applies to subagent delegation only — primaries use pi's session-wide skill set (#19)`,
+      "warning",
+    );
+  }
+}
 
 interface OriginalState {
   model: Model<any> | undefined;
@@ -55,6 +72,8 @@ export class AgentManager {
   async apply(name: string, pi: ExtensionAPI, ctx: ExtensionContext): Promise<boolean> {
     const agent = this.agents.get(name);
     if (!agent) return false;
+
+    warnAgentSkillsPrimary(agent, ctx.ui);
 
     // Snapshot state on first apply (for restore on clear)
     if (this.activeName === undefined) {
