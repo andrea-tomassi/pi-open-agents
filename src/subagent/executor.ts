@@ -75,7 +75,11 @@ export interface AgentResult extends AgentProgress {
 
 export interface PiResolution {
   command: string;
-  entryPoint: string;
+  /**
+   * Entry module to run under `command`. Absent when `command` is a compiled
+   * binary that already is the CLI.
+   */
+  entryPoint?: string;
 }
 
 export interface ProcessInvocation {
@@ -227,9 +231,56 @@ export function subagentSessionDir(
   return path.join(agentDir, "sessions", safeProject, "subagents");
 }
 
+/**
+ * True when a path points into the virtual, in-memory filesystem of a
+ * `bun build --compile` binary (`/$bunfs/...`, `~BUN/...`). Those paths do not
+ * exist on disk, so they can neither be resolved nor spawned.
+ */
+function isVirtualBunPath(candidate: string | undefined): boolean {
+  if (!candidate) return false;
+  const normalized = candidate.replace(/%7E/gi, "~");
+  return normalized.includes("$bunfs") || normalized.includes("~BUN");
+}
+
+/**
+ * Resolve how to launch a child pi process.
+ *
+ * A compiled pi binary reports virtual paths for `process.execPath` and
+ * `process.argv[1]`, both of which fail to stat. In that case the binary itself
+ * is the CLI: the real executable becomes the command and no entry module is
+ * passed, because a stray positional argument would be read as prompt text.
+ */
+function resolveHostLauncher(): { command: string; compiled: boolean } {
+  const compiled =
+    isVirtualBunPath(process.execPath) || isVirtualBunPath(process.argv[1]);
+  if (!compiled) return { command: process.execPath, compiled: false };
+
+  // /proc/self/exe is authoritative on Linux, where compiled builds ship today.
+  for (const candidate of ["/proc/self/exe", process.argv[0]]) {
+    if (!candidate) continue;
+    try {
+      const resolved = realpathSync(candidate);
+      if (!isVirtualBunPath(resolved)) return { command: resolved, compiled: true };
+    } catch {
+      // Try the next candidate.
+    }
+  }
+
+  return { command: process.execPath, compiled: true };
+}
+
 export function resolvePiEntryPoint(
   resolveSelf: (specifier: string) => string = (specifier) => import.meta.resolve(specifier),
 ): PiResolution {
+  const host = resolveHostLauncher();
+
+  // A compiled binary already is the CLI, so it takes no entry module. This is
+  // also why the check runs before self-resolution: the resolved cli.js path is
+  // meaningless to a compiled host and would arrive as a positional argument.
+  if (host.compiled) {
+    return { command: host.command };
+  }
+
   let packageEntryPoint: string;
   try {
     packageEntryPoint = fileURLToPath(resolveSelf("@earendil-works/pi-coding-agent"));
@@ -240,13 +291,13 @@ export function resolvePiEntryPoint(
     // tree (peer dependencies are never installed next to it). Fall back to
     // the running pi entry itself — the child must run the same pi anyway.
     return {
-      command: process.execPath,
+      command: host.command,
       entryPoint: realpathSync(process.argv[1]),
     };
   }
   const packageRoot = path.dirname(path.dirname(packageEntryPoint));
   return {
-    command: process.execPath,
+    command: host.command,
     entryPoint: path.join(packageRoot, "dist", "cli.js"),
   };
 }
@@ -543,7 +594,8 @@ export async function runSubagent(options: RunSubagentOptions): Promise<AgentRes
 
     // ── Build CLI args ──
     const args = [
-      pi.entryPoint,
+      // Absent for a compiled host binary; see resolveHostLauncher.
+      ...(pi.entryPoint ? [pi.entryPoint] : []),
       "--mode", "json",
       "-p",
       "--no-skills",
