@@ -440,10 +440,28 @@ function usageFromMessage(
   };
 }
 
+/**
+ * Extract the display model string from an assistant message (issue #27).
+ *
+ * `AssistantMessage` always carries both `provider` and `model`, so prefix the
+ * bare id (`provider/model`) to match the `model:` frontmatter format and the
+ * per-call override (`parseModelRef` splits on the first slash, so a
+ * namespaced id such as `anthropic/claude-opus-5.5` under `openrouter`
+ * round-trips exactly). No `provider` → bare id, as before.
+ *
+ * The `startsWith` guard prevents `provider/provider/...` when a host echoes
+ * an already-qualified id. Deliberately NOT `responseModel`: that is the
+ * provider-native answering snapshot (alias → dated version), a different
+ * granularity from "which provider ran the agent".
+ */
 function modelFromMessage(message: unknown): string | undefined {
   if (!message || typeof message !== "object") return undefined;
-  const model = (message as { model?: unknown }).model;
-  return typeof model === "string" ? model : undefined;
+  const data = message as { provider?: unknown; model?: unknown };
+  if (typeof data.model !== "string") return undefined;
+  if (typeof data.provider === "string" && !data.model.startsWith(`${data.provider}/`)) {
+    return `${data.provider}/${data.model}`;
+  }
+  return data.model;
 }
 
 function updateUsage(target: AgentUsage, update: Partial<AgentUsage> | undefined) {
