@@ -227,9 +227,95 @@ export function subagentSessionDir(
   return path.join(agentDir, "sessions", safeProject, "subagents");
 }
 
+/**
+ * Detect Bun's in-memory virtual paths (issue #28).
+ *
+ * Inside a `bun build --compile` single-file binary, `process.argv[1]` (and on
+ * some platforms `process.execPath`) resolves to a compile-time virtual entry
+ * such as `/$bunfs/root/pi`. That path does not exist on disk — any
+ * `realpathSync`/`lstat` on it throws ENOENT. A real on-disk executable path
+ * never contains these markers, so the check has no false positives.
+ */
+export function isVirtualBunPath(candidate: string | undefined | null): boolean {
+  if (!candidate) return false;
+  return (
+    candidate.includes("$bunfs") || candidate.includes("~BUN") || candidate.includes("%7EBUN")
+  );
+}
+
+/**
+ * Injectable host-process values for {@link resolvePiEntryPoint}.
+ *
+ * The production default reads `process.execPath` / `process.argv` /
+ * `/proc/self/exe` directly. Tests inject exact strings (including the
+ * virtual `/$bunfs/...` paths a compiled host reports) without spawning
+ * a real compiled binary.
+ */
+export interface HostProcessProbe {
+  execPath?: string;
+  argv0?: string;
+  argv1?: string;
+  readProcSelfExe?: () => string;
+}
+
+/**
+ * Pick the real executable for a compiled single-file host (issue #28).
+ *
+ * Priority order (most reliable first):
+ * 1. `/proc/self/exe` (kernel truth on Linux),
+ * 2. `process.execPath` (real in every observed compiled binary),
+ * 3. `process.argv[0]` — ONLY when absolute. A compiled Bun binary reports
+ *    the bare word `"bun"` here, which must never become the spawn command
+ *    (it would resolve via PATH to the Bun runtime instead of pi).
+ *
+ * Returns `undefined` when every candidate is missing or virtual — the caller
+ * turns that into a descriptive error instead of spawning a `$bunfs` path.
+ */
+export function resolveCompiledCommand(probe: {
+  execPath?: string;
+  argv0?: string;
+  procSelfExe?: string | undefined;
+}): string | undefined {
+  for (const candidate of [probe.procSelfExe, probe.execPath]) {
+    if (candidate && !isVirtualBunPath(candidate)) return candidate;
+  }
+  const argv0 = probe.argv0;
+  if (argv0 && path.isAbsolute(argv0) && !isVirtualBunPath(argv0)) return argv0;
+  return undefined;
+}
+
 export function resolvePiEntryPoint(
   resolveSelf: (specifier: string) => string = (specifier) => import.meta.resolve(specifier),
+  hostProbe?: HostProcessProbe,
 ): PiResolution {
+  const execPath = hostProbe?.execPath ?? process.execPath;
+  const argv0 = hostProbe?.argv0 ?? process.argv[0];
+  const argv1 = hostProbe?.argv1 ?? process.argv[1];
+
+  // Compiled single-file host (`bun build --compile`): the entry "file" is a
+  // virtual `$bunfs` path that does not exist on disk. The binary IS the CLI,
+  // so resolve the real executable and return an empty entry point — the args
+  // builder omits it and the child receives only real CLI flags.
+  if (isVirtualBunPath(execPath) || isVirtualBunPath(argv1)) {
+    let procSelfExe: string | undefined;
+    try {
+      procSelfExe = hostProbe?.readProcSelfExe
+        ? hostProbe.readProcSelfExe()
+        : realpathSync("/proc/self/exe");
+    } catch {
+      procSelfExe = undefined;
+    }
+    const command = resolveCompiledCommand({ execPath, argv0, procSelfExe });
+    if (!command) {
+      throw new Error(
+        "pi-open-agents: running inside a compiled single-file pi binary but the real " +
+          "executable path could not be determined (only virtual paths available). " +
+          "Subagent delegation is unavailable in this environment.",
+      );
+    }
+    return { command, entryPoint: "" };
+  }
+
   let packageEntryPoint: string;
   try {
     packageEntryPoint = fileURLToPath(resolveSelf("@earendil-works/pi-coding-agent"));
@@ -239,14 +325,21 @@ export function resolvePiEntryPoint(
     // resolution which cannot see the host package from the plugin's install
     // tree (peer dependencies are never installed next to it). Fall back to
     // the running pi entry itself — the child must run the same pi anyway.
+    if (!argv1) {
+      throw new Error(
+        "pi-open-agents: cannot resolve the pi CLI entry point (host package " +
+          "self-resolution failed and process.argv[1] is missing). " +
+          "Subagent delegation is unavailable in this environment.",
+      );
+    }
     return {
-      command: process.execPath,
-      entryPoint: realpathSync(process.argv[1]),
+      command: execPath,
+      entryPoint: realpathSync(argv1),
     };
   }
   const packageRoot = path.dirname(path.dirname(packageEntryPoint));
   return {
-    command: process.execPath,
+    command: execPath,
     entryPoint: path.join(packageRoot, "dist", "cli.js"),
   };
 }
@@ -542,8 +635,11 @@ export async function runSubagent(options: RunSubagentOptions): Promise<AgentRes
     const modelRegistry = buildModelRegistry(options.agentDir);
 
     // ── Build CLI args ──
+    // A compiled single-file host IS the CLI: its PiResolution carries an
+    // empty entryPoint (issue #28) and the child receives only real CLI
+    // flags. Non-compiled hosts keep runtime + script + flags, unchanged.
     const args = [
-      pi.entryPoint,
+      ...(pi.entryPoint ? [pi.entryPoint] : []),
       "--mode", "json",
       "-p",
       "--no-skills",

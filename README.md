@@ -398,7 +398,7 @@ opening an issue or pull request.
 
 ```bash
 npm install
-npm test          # 178 tests
+npm test          # 191 tests
 npm run typecheck # tsc --noEmit
 ```
 
