@@ -167,6 +167,15 @@ active agent's rules *before it runs* — not just used to filter the toolset:
 > blocks matching *individual calls* (patterns included), not just statically
 > hiding whole tools. (#20)
 
+> **⚠️ Behavior change (v0.1.30):** primary-agent static filtering now covers
+> **all tool sources**, not just builtins (#18). If an agent declares
+> `permission` or `tools:`, extension tools (web, LSP, MCP, …) not matched
+> are hidden from the model — previously they were always kept. Only blanket
+> `deny` rules hide a tool; argument-pattern denies and `ask` stay enforced
+> by the runtime gate. If your allowlist drops `subagent`, the agent cannot
+> delegate anymore — apply warns you explicitly. No restrictions = everything
+> stays active, exactly as before.
+
 **Inheritance down the delegation chain (#8).** A subagent can never exceed
 the authority of the agent that delegated to it — in both directions of the
 rule language:
@@ -387,6 +396,7 @@ six sessions, zero chaos: that's the exact workstation setup documented in
 - ~~**Parent permission inheritance** for subagents~~ — ✅ shipped in [0.1.27](https://github.com/andrea-tomassi/pi-open-agents/releases/tag/v0.1.27) (#8)
 - ~~**Agent hot-reload**~~ — ✅ works via pi's built-in `/reload`, shipped in [0.1.27](https://github.com/andrea-tomassi/pi-open-agents/releases/tag/v0.1.27) (#9)
 - ~~**Per-call model override** in `subagent()`~~ — ✅ shipped in [0.1.19](https://github.com/andrea-tomassi/pi-open-agents/releases/tag/v0.1.19) (#10)
+- ~~**Primary tool filters incl. extension tools**~~ — ✅ shipped in [0.1.30](https://github.com/andrea-tomassi/pi-open-agents/releases/tag/v0.1.30) (#18)
 - **Parallel subagent limit** — #11
 
 ---
@@ -398,7 +408,7 @@ opening an issue or pull request.
 
 ```bash
 npm install
-npm test          # 197 tests
+npm test          # 207 tests
 npm run typecheck # tsc --noEmit
 ```
 

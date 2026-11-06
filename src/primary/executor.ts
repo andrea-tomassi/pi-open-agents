@@ -75,47 +75,72 @@ function applyThinking(agent: AgentDefinition, pi: ExtensionAPI): void {
  *
  * Logic:
  * 1. If agent has permission rules → filter via permission engine
- * 2. Else if agent has tools whitelist → filter to only those (builtin only)
+ * 2. Else if agent has tools whitelist → filter to only those
  * 3. Otherwise → all tools active
  *
- * Extension-provided tools (MCP, SDK) always remain active.
+ * Filtering covers ALL registered tool sources (builtin, extension, MCP,
+ * SDK): a restricted profile can hide extension tools (web, LSP, …) from
+ * the model, not just block their calls. Only blanket `deny` rules hide a
+ * tool statically — argument-pattern denies and `ask` stay enforced by the
+ * runtime gate (#20), which also remains the backstop for tools registered
+ * after the agent started (issue #18).
+ *
+ * @returns The applied active tool names (for the subagent-hidden warning).
  */
-function applyTools(agent: AgentDefinition, pi: ExtensionAPI): void {
-  const allTools = pi.getAllTools();
-
-  // Case 1: Permission-based filtering
+export function computeActiveTools(
+  agent: AgentDefinition,
+  allTools: Array<{ name: string }>,
+): string[] {
+  // Case 1: Permission-based filtering (all sources)
   if (agent.permission) {
     const rules = parsePermissionRules(agent.permission);
     const disabled = getDisabledTools(
       allTools.map((t) => t.name),
       rules,
     );
-    const filtered = allTools
-      .filter((t) => {
-        // Always keep non-builtin tools (extensions, MCP)
-        if (t.sourceInfo?.source !== "builtin") return true;
-        return !disabled.has(t.name);
-      })
-      .map((t) => t.name);
-    pi.setActiveTools(filtered);
-    return;
+    return allTools.filter((t) => !disabled.has(t.name)).map((t) => t.name);
   }
 
-  // Case 2: Simple tools whitelist (builtin only)
+  // Case 2: Simple tools whitelist (all sources)
   if (agent.tools && agent.tools.length > 0) {
     const whitelist = new Set(agent.tools.map((t) => t.toLowerCase()));
-    const filtered = allTools
-      .filter((t) => {
-        if (t.sourceInfo?.source !== "builtin") return true;
-        return whitelist.has(t.name.toLowerCase());
-      })
+    return allTools
+      .filter((t) => whitelist.has(t.name.toLowerCase()))
       .map((t) => t.name);
-    pi.setActiveTools(filtered);
-    return;
   }
 
   // Case 3: No restrictions — keep all tools
-  pi.setActiveTools(allTools.map((t) => t.name));
+  return allTools.map((t) => t.name);
+}
+
+function applyTools(agent: AgentDefinition, pi: ExtensionAPI): string[] {
+  const active = computeActiveTools(agent, pi.getAllTools());
+  pi.setActiveTools(active);
+  return active;
+}
+
+/**
+ * Warn when an agent's static restrictions hide the `subagent` tool (#18).
+ *
+ * Without it the model cannot delegate at all — that may be exactly what a
+ * locked-down profile wants, but it must be a deliberate choice, never a
+ * surprise from an allowlist that simply forgot to name it.
+ */
+export function warnIfHidingSubagent(
+  agent: AgentDefinition,
+  allNames: string[],
+  activeNames: string[],
+  ui: ExtensionContext["ui"],
+): void {
+  const restricted = agent.permission !== undefined || (agent.tools?.length ?? 0) > 0;
+  if (!restricted) return;
+  if (!allNames.includes("subagent")) return;
+  if (activeNames.includes("subagent")) return;
+  ui.notify(
+    `Agent "${agent.name}": tool restrictions hide the "subagent" tool — this agent cannot delegate. ` +
+      `Add "subagent" to the allowlist if delegation is intended.`,
+    "warning",
+  );
 }
 
 // ─── Main Entry Point ────────────────────────────────────────────────────────
@@ -131,7 +156,9 @@ export async function applyAgentConfig(
 ): Promise<void> {
   await applyModel(agent, pi, ctx);
   applyThinking(agent, pi);
-  applyTools(agent, pi);
+  const before = pi.getAllTools().map((t) => t.name);
+  const active = applyTools(agent, pi);
+  warnIfHidingSubagent(agent, before, active, ctx.ui);
 }
 
 /**
