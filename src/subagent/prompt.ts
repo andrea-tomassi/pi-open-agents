@@ -78,8 +78,8 @@ export function buildClosingContract(outputPath?: string): string {
     "",
     "If you produced files the caller asked for, list each on its own line as",
     "`<path>` — <one line describing the content>.",
-    "Keep the outcome block to 2-3 lines. Never paste the full output after the",
-    "marker when a file reference suffices; never hide an error behind a file reference.",
+    "Keep the outcome block to 2-3 lines. Keep the rest of your answer concise — the",
+    "outcome block is what the caller reads first; never hide an error behind brevity.",
   ];
   if (outputPath) {
     lines.push(
