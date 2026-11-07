@@ -13,6 +13,12 @@ export interface BuildPromptOptions {
   agent: AgentDefinition;
   cwd: string;
   agentDir?: string;
+  /**
+   * Commissioned deliverable path (issue #32). When set, the child is told
+   * to write its main deliverable there and cite it in the outcome block.
+   * Already resolved against the child cwd by the caller.
+   */
+  outputPath?: string;
 }
 
 export interface BuildPromptResult {
@@ -49,9 +55,46 @@ function formatSkillsForPrompt(
 }
 
 /**
+ * Child-side result contract (issue #32).
+ *
+ * Every run archives the full output to a temp file and returns only a
+ * short outcome inline — the child must therefore END its final message
+ * with a brief outcome block after a `## Outcome` marker line, cite
+ * commissioned files as `` `<path>` — <one-line description> '' ›, and keep
+ * errors inline (never behind a file reference).
+ */
+export function buildClosingContract(outputPath?: string): string {
+  const lines = [
+    "",
+    "",
+    "## Result Contract",
+    "",
+    "When your task is complete, end your final message with a short outcome block,",
+    "separated from the rest by a line containing exactly `## Outcome`:",
+    "",
+    "## Outcome",
+    "Outcome: <one line — done / failed + why>",
+    "Details: <what matters for the caller's next step, 2-3 lines>",
+    "",
+    "If you produced files the caller asked for, list each on its own line as",
+    "`<path>` — <one line describing the content>.",
+    "Keep the outcome block to 2-3 lines. Never paste the full output after the",
+    "marker when a file reference suffices; never hide an error behind a file reference.",
+  ];
+  if (outputPath) {
+    lines.push(
+      "",
+      `The caller expects its deliverable at \`${outputPath}\` — write it there with your file tools`,
+      "and cite it in the outcome block.",
+    );
+  }
+  return lines.join("\n");
+}
+/**
  * Build the system prompt for a subagent.
  *
- * Starts with the agent body, appends skill injection if the agent has skills.
+ * Starts with the agent body, appends skill injection if the agent has skills,
+ * then the result-closing contract (issue #32).
  */
 export async function buildSubagentPrompt(options: BuildPromptOptions): Promise<BuildPromptResult> {
   let prompt = options.agent.prompt;
@@ -74,6 +117,8 @@ export async function buildSubagentPrompt(options: BuildPromptOptions): Promise<
       prompt = `${prompt}${injection}`;
     }
   }
+
+  prompt = `${prompt}${buildClosingContract(options.outputPath)}`;
 
   return { prompt, skills: skillsResult };
 }

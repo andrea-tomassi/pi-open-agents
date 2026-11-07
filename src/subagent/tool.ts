@@ -55,6 +55,12 @@ interface SubagentParams {
   cwd?: string;
   session?: SubagentSessionMode;
   model?: string;
+  /**
+   * Commissioned deliverable path (issue #32). The child writes its main
+   * deliverable there and cites it in the closing outcome; the full
+   * transcript is always archived to temp regardless.
+   */
+  output?: string;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -279,7 +285,7 @@ export function registerSubagentTool(
     name: "subagent",
     label: "Subagent",
     description: "Delegate a task to a named sub-agent running in an isolated pi process.",
-    promptSnippet: "Delegate isolated tasks with subagent({ agent, task, cwd?, session?, model? }).",
+    promptSnippet: "Delegate isolated tasks with subagent({ agent, task, cwd?, session?, model?, output? }).",
     promptGuidelines,
     parameters: Type.Object({
       agent: Type.String({ description: "Name of the agent to invoke" }),
@@ -293,6 +299,11 @@ export function registerSubagentTool(
       model: Type.Optional(
         Type.String({
           description: 'Per-call model override in "provider/model-id" format (e.g. "anthropic/claude-sonnet-4-5"). Model ids may contain slashes for aggregator providers ("openrouter/anthropic/claude-opus-5.5"). Takes precedence over the agent definition default.',
+        }),
+      ),
+      output: Type.Optional(
+        Type.String({
+          description: "Deliverable file path. The child writes its main deliverable there (relative paths resolve against the child cwd) and cites it in the closing outcome. The full transcript is always archived to temp regardless.",
         }),
       ),
     }),
@@ -356,6 +367,7 @@ export function registerSubagentTool(
         agentDir: options.agentDir,
         session,
         modelOverride: params.model,
+        outputPath: params.output && params.output.trim() ? params.output : undefined,
         parentCeiling,
         parentRules: parentRules.length > 0 ? parentRules : undefined,
         onProgress: (progress) => onUpdate?.(toProgressResult(progress)),

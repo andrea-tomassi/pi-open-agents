@@ -127,6 +127,13 @@ export interface RunSubagentOptions {
   parentCeiling?: string[];
   /** Parent's restrictive (deny/ask) permission rules, inherited into the child's gate via env. */
   parentRules?: Array<{ permission: string; pattern: string; action: "deny" | "ask" }>;
+  /**
+   * Commissioned deliverable path (issue #32). When set, the child is
+   * instructed to write its main deliverable there (resolved against cwd
+   * when relative) and cite it in the outcome block. Independent from the
+   * automatic temp archive of the full transcript output.
+   */
+  outputPath?: string;
   resolvePi?: () => Promise<PiResolution> | PiResolution;
   runner?: ProcessRunner;
   fs?: ExecutorFs;
@@ -214,6 +221,31 @@ export function composeChildTools(
   const allowed = new Set(ceiling);
   const result = base.filter((t) => allowed.has(t));
   return result.length > 0 ? result : "none";
+}
+
+/**
+ * Marker separating the child's full transcript from its closing outcome
+ * block (issue #32). The child is instructed (see buildClosingContract) to
+ * end its final message with a `## Outcome` line followed by 2-3 lines.
+ */
+export const OUTCOME_MARKER = "## Outcome";
+
+/**
+ * Split the child's closing outcome block off the full output.
+ *
+ * Returns the text after the LAST marker line (case-insensitive, surrounding
+ * whitespace ignored), or undefined when the child omitted the block —
+ * older agents and error paths fall back to today's truncated inline.
+ */
+export function extractOutcomeBlock(output: string): string | undefined {
+  const lines = output.split("\n");
+  let idx = -1;
+  lines.forEach((line, i) => {
+    if (line.trim().toLowerCase() === OUTCOME_MARKER.toLowerCase()) idx = i;
+  });
+  if (idx === -1) return undefined;
+  const rest = lines.slice(idx + 1).join("\n").trim();
+  return rest ? rest : undefined;
 }
 
 export function subagentSessionDir(
@@ -620,12 +652,25 @@ export async function runSubagent(options: RunSubagentOptions): Promise<AgentRes
     options.onProgress?.(progress(status));
 
   try {
+    // ── Commissioned deliverable (issue #32) ──
+    // Resolved against the child cwd so the closing contract can name the
+    // exact path and the task can point at it.
+    const deliverablePath =
+      options.outputPath && options.outputPath.trim()
+        ? path.resolve(options.cwd, options.outputPath)
+        : undefined;
+    const task =
+      deliverablePath !== undefined
+        ? `${options.task}\n\nDeliverable: save your main deliverable to ${deliverablePath} and cite it in the outcome block.`
+        : options.task;
+
     // ── Build system prompt ──
     const promptFilePath = path.join(tempDir, "system-prompt.md");
     const promptResult = await buildSubagentPrompt({
       agent: options.agent,
       cwd: options.cwd,
       agentDir: options.agentDir,
+      outputPath: deliverablePath,
     });
 
     for (const source of promptResult.skills.skippedPackages) {
@@ -641,9 +686,9 @@ export async function runSubagent(options: RunSubagentOptions): Promise<AgentRes
 
     // ── Write task to file if too long ──
     let taskFilePath: string | undefined;
-    if (options.task.length > TASK_FILE_THRESHOLD) {
+    if (task.length > TASK_FILE_THRESHOLD) {
       taskFilePath = path.join(tempDir, "task.md");
-      await fileSystem.writeFile(taskFilePath, options.task);
+      await fileSystem.writeFile(taskFilePath, task);
     }
 
     // ── Resolve pi CLI entry point ──
@@ -701,7 +746,7 @@ export async function runSubagent(options: RunSubagentOptions): Promise<AgentRes
     }
 
     // Task
-    args.push(buildTaskArgument(options.task, taskFilePath));
+    args.push(buildTaskArgument(task, taskFilePath));
 
     // ── Build env vars ──
     const envVars: SubagentEnvVars = {
@@ -810,16 +855,38 @@ export async function runSubagent(options: RunSubagentOptions): Promise<AgentRes
       output = stderr || `Subagent exited with code ${exit.exitCode}`;
     }
 
-    // ── Truncate large output ──
-    const truncated = truncateHeadContent(output, OUTPUT_MAX_BYTES, OUTPUT_MAX_LINES);
-    if (truncated !== undefined) {
-      const originalOutput = output;
-      const fullOutputPath = path.join(
-        options.outputArchiveDir ?? os.tmpdir(),
-        `${safeFilePart(options.agent.name)}-${startedAt}-output.md`,
+    // ── Archive full output + derive the inline result (issue #32) ──
+    // Every run archives the verbatim output to a temp file; inline the
+    // child only sends its closing outcome block (file reference included).
+    // Without the block (older agents, error paths) fall back to today's
+    // truncated inline. A failed archive write must never break delegation:
+    // fall back to inline-only and warn.
+    const fullOutputPath = path.join(
+      options.outputArchiveDir ?? os.tmpdir(),
+      `${safeFilePart(options.agent.name)}-${startedAt}-output.md`,
+    );
+    let archived = false;
+    try {
+      await fileSystem.writeFile(fullOutputPath, output);
+      archived = true;
+    } catch (error) {
+      console.warn(
+        `[pi-open-agents] could not archive subagent output to ${fullOutputPath}: ${error instanceof Error ? error.message : String(error)}`,
       );
-      await fileSystem.writeFile(fullOutputPath, originalOutput);
-      output = `${truncated}\n\n[Output truncated: original ${originalOutput.split("\n").length} lines / ${byteLength(originalOutput)} bytes. Full output: ${fullOutputPath}]`;
+    }
+    const outcome = extractOutcomeBlock(output);
+    if (archived && outcome !== undefined) {
+      output = `${outcome}\n\nFull output: ${fullOutputPath}`;
+    } else if (archived) {
+      const truncated = truncateHeadContent(output, OUTPUT_MAX_BYTES, OUTPUT_MAX_LINES);
+      if (truncated !== undefined) {
+        output = `${truncated}\n\n[Output truncated: original ${output.split("\n").length} lines / ${byteLength(output)} bytes. Full output: ${fullOutputPath}]`;
+      }
+    } else {
+      const truncated = truncateHeadContent(output, OUTPUT_MAX_BYTES, OUTPUT_MAX_LINES);
+      if (truncated !== undefined) {
+        output = `${truncated}\n\n[Output truncated: original ${output.split("\n").length} lines / ${byteLength(output)} bytes. Archive write failed — full output unavailable.]`;
+      }
     }
 
     const result: AgentResult = {

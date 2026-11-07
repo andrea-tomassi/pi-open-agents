@@ -261,9 +261,9 @@ export { matchPattern, isWildcardPattern } from "./permission/matcher.ts";
 export { evaluate, toolToPermission, getDisabledTools, filterDisabledTools } from "./permission/evaluator.ts";
 
 // Subagent re-exports
-export { runSubagent, resolveSubagentSession, resolvePiEntryPoint, isVirtualBunPath, resolveCompiledCommand } from "./subagent/executor.ts";
+export { runSubagent, resolveSubagentSession, resolvePiEntryPoint, isVirtualBunPath, resolveCompiledCommand, extractOutcomeBlock, OUTCOME_MARKER } from "./subagent/executor.ts";
 export type { AgentProgress, AgentResult, RunSubagentOptions, SubagentSessionInfo, SubagentSessionMode, HostProcessProbe } from "./subagent/executor.ts";
 export { resolveSkills } from "./subagent/skills.ts";
 export type { ResolvedSkill } from "./subagent/skills.ts";
-export { buildSubagentPrompt } from "./subagent/prompt.ts";
+export { buildSubagentPrompt, buildClosingContract } from "./subagent/prompt.ts";
 export { formatResultLines, formatUsage } from "./subagent/render.ts";

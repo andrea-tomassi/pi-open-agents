@@ -201,7 +201,7 @@ export function buildSubagentGuidance(
     .map((a) => `- ${a.name}: ${a.description ?? "Subagent for delegated tasks."}`)
     .join("\n");
 
-  return `\n\n## Subagent Delegation\n\nYou have ${available.length} subagent(s) available. Delegate isolated tasks using the \`subagent\` tool:\n\nsubagent({ agent: "<name>", task: "<task description>" })\n\nAvailable subagents:\n${list}\n\nIMPORTANT: Subagent names are NOT bash commands. Always use the \`subagent\` tool to delegate — never write scripts that call agent names as CLI commands.`;
+  return `\n\n## Subagent Delegation\n\nYou have ${available.length} subagent(s) available. Delegate isolated tasks using the \`subagent\` tool:\n\nsubagent({ agent: "<name>", task: "<task description>" })\n\nAvailable subagents:\n${list}\n\nSubagent output: every run saves its full output to a temp file and returns only a short outcome summary — open the file only if the summary is not enough to decide your next step. Pass \`output: "<path>"\` when the deliverable itself is a file (report, patch, doc): the child writes it there and cites it in its summary. On failure the child always returns the error inline.\n\nIMPORTANT: Subagent names are NOT bash commands. Always use the \`subagent\` tool to delegate — never write scripts that call agent names as CLI commands.`;
 }
 
 /**

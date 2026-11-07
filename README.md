@@ -167,6 +167,11 @@ active agent's rules *before it runs* — not just used to filter the toolset:
 > blocks matching *individual calls* (patterns included), not just statically
 > hiding whole tools. (#20)
 
+> **⚠️ Behavior change (v0.1.31):** subagent results are now file + summary
+> by default — full output goes to a temp archive, inline carries the child's
+> closing outcome block (#32). If you parsed full inline output
+> programmatically, read the archive path from the result instead.
+
 > **⚠️ Behavior change (v0.1.30):** primary-agent static filtering now covers
 > **all tool sources**, not just builtins (#18). If an agent declares
 > `permission` or `tools:`, extension tools (web, LSP, MCP, …) not matched
@@ -208,11 +213,23 @@ If an agent has the `subagent` tool, the plugin automatically appends a
 subagents and the correct call syntax:
 
 ```
-subagent({ agent: "<name>", task: "<task>", cwd?, session?, model? })
+subagent({ agent: "<name>", task: "<task>", cwd?, session?, model?, output? })
 ```
 
 You never need to explain delegation mechanics in agent prompts. The plugin
 handles it, the same way pi handles tool descriptions.
+
+### Subagent output: file + summary (not full-inline)
+
+Every run archives its verbatim output to a temp file and returns only a
+short outcome inline — open the file only if the summary is not enough to
+decide the next step. The child is instructed (via its system prompt) to end
+with a `## Outcome` block; without it, the executor falls back to today's
+truncated inline. Pass `output: "<path>"` when the deliverable itself is a
+file: the child writes it there and cites it as `` `<path>` — <what it
+contains> '' ›. On failure the error always comes back inline, never behind a
+file reference. Inspired by @EduardoOrtiz89's fork (`output`/`outputMode`),
+redesigned as the default instead of an opt-in (#32).
 
 ### Subagent execution engine
 
@@ -397,6 +414,7 @@ six sessions, zero chaos: that's the exact workstation setup documented in
 - ~~**Agent hot-reload**~~ — ✅ works via pi's built-in `/reload`, shipped in [0.1.27](https://github.com/andrea-tomassi/pi-open-agents/releases/tag/v0.1.27) (#9)
 - ~~**Per-call model override** in `subagent()`~~ — ✅ shipped in [0.1.19](https://github.com/andrea-tomassi/pi-open-agents/releases/tag/v0.1.19) (#10)
 - ~~**Primary tool filters incl. extension tools**~~ — ✅ shipped in [0.1.30](https://github.com/andrea-tomassi/pi-open-agents/releases/tag/v0.1.30) (#18)
+- ~~**Subagent output: file + summary**~~ — ✅ shipped in [0.1.31](https://github.com/andrea-tomassi/pi-open-agents/releases/tag/v0.1.31) (#32)
 - **Parallel subagent limit** — #11
 
 ---
@@ -408,7 +426,7 @@ opening an issue or pull request.
 
 ```bash
 npm install
-npm test          # 207 tests
+npm test          # 216 tests
 npm run typecheck # tsc --noEmit
 ```
 
