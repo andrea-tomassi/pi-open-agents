@@ -45,7 +45,7 @@ import {
   parentInheritedRules,
   type RecursionEnv,
 } from "./env.ts";
-import { preview, shortenPath, stringArg } from "../utils/format.ts";
+import { byteLength, preview, shortenPath, stringArg } from "../utils/format.ts";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -161,9 +161,39 @@ function toToolResult(result: AgentResult) {
 
 function toProgressResult(progress: AgentProgress) {
   return {
-    content: [{ type: "text" as const, text: progress.output || "(running...)" }],
+    content: [{ type: "text" as const, text: liveProgressText(progress.output) }],
     details: progress,
   };
+}
+
+/**
+ * Cap for live progress text (issue #32 follow-up).
+ *
+ * Every progress emit used to re-send the child's ENTIRE accumulated output:
+ * over a long run the same bytes go out N times (once per event, growing).
+ * Partial updates are transient (never persisted to the transcript — verified
+ * against live session JSONL), so the cap only trims live display/RPC traffic:
+ * the tail stays (what the child is doing *now*), the head is already in the
+ * temp archive. Final results are untouched (see toToolResult).
+ */
+export const LIVE_PROGRESS_MAX_BYTES = 2048;
+
+/** Tail a string to a byte budget (halving converge, multibyte-safe). */
+export function tailTextByBytes(text: string, maxBytes: number): string {
+  if (byteLength(text) <= maxBytes) return text;
+  let take = Math.min(text.length, maxBytes);
+  let cut = text.slice(text.length - take);
+  while (byteLength(cut) > maxBytes && take > 0) {
+    take = Math.floor(take / 2);
+    cut = text.slice(text.length - take);
+  }
+  return cut;
+}
+
+function liveProgressText(output: string | undefined): string {
+  const text = output || "(running...)";
+  const tailed = tailTextByBytes(text, LIVE_PROGRESS_MAX_BYTES);
+  return tailed.length < text.length ? `[…earlier live output omitted…]\n${tailed}` : text;
 }
 
 // ─── Styled Rendering ────────────────────────────────────────────────────────

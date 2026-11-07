@@ -24,17 +24,20 @@ import type {
 
 type ExecutorModule = typeof import("../src/subagent/executor.ts");
 type PromptModule = typeof import("../src/subagent/prompt.ts");
+type ToolModule = typeof import("../src/subagent/tool.ts");
 
 let executor: ExecutorModule | undefined;
 let promptMod: PromptModule | undefined;
+let toolMod: ToolModule | undefined;
 try {
   executor = await import("../src/subagent/executor.ts");
   promptMod = await import("../src/subagent/prompt.ts");
+  toolMod = await import("../src/subagent/tool.ts");
 } catch {
   executor = undefined;
 }
 
-const run = executor && promptMod ? test : test.skip;
+const run = executor && promptMod && toolMod ? test : test.skip;
 
 const baseAgent: AgentDefinition = {
   name: "worker",
@@ -274,4 +277,68 @@ run("#32: failing child keeps the error inline", async () => {
 
   assert.equal(result.isError, true);
   assert.ok(result.output.includes("partial work"), "error output stays inline");
+});
+
+// ─── Live progress cap ─────────────────────────────────────────────────────
+
+run("#32 cap: tailTextByBytes keeps short text, tails long text", () => {
+  const { tailTextByBytes, LIVE_PROGRESS_MAX_BYTES } = toolMod!;
+  assert.equal(tailTextByBytes("short", LIVE_PROGRESS_MAX_BYTES), "short");
+  const long = `${"x".repeat(5000)}-TAIL`;
+  const tailed = tailTextByBytes(long, 100);
+  assert.ok(tailed.endsWith("-TAIL"), "tail keeps the end");
+  assert.ok(tailed.length <= 100, `tail stays in budget, got ${tailed.length}`);
+  assert.ok(tailTextByBytes("héllo-wörld-ünïcödé", 1000).endsWith("ünïcödé"), "multibyte-safe");
+});
+
+run("#32 cap: live updates carry the tail, final result stays whole", async () => {
+  const { registerSubagentTool } = toolMod!;
+  const body = Array.from({ length: 200 }, (_, i) => `transcript line ${i} with padding`).join("\n");
+  const fullWithOutcome = `${body}\n## Outcome\nOutcome: done\nDetails: fine`;
+  const emptyUsage = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0, contextTokens: 0 };
+  // Fake the executor: emit growing progress like a long run, then resolve
+  // with the full output (the archive split happens in the real runSubagent,
+  // covered by the tests above — here only the live-update path matters).
+  const fakeRun = async (opts: { onProgress?: (p: never) => void }) => {
+    for (let i = 1; i <= 3; i++) {
+      opts.onProgress?.({
+        agent: "worker", status: "running", output: body.slice(0, Math.floor((body.length * i) / 3)),
+        tools: [], usage: { ...emptyUsage }, startedAt: 0, elapsedMs: 0,
+      } as never);
+    }
+    return {
+      agent: "worker", status: "done", output: fullWithOutcome, tools: [],
+      usage: { ...emptyUsage }, startedAt: 0, elapsedMs: 0,
+      isError: false, exitCode: 0, stderr: "",
+    };
+  };
+  const updates: string[] = [];
+  let capturedExecute: ((params: unknown, ctx: unknown) => Promise<unknown>) | undefined;
+  const fakePi = {
+    registerTool: (def: { execute: (t: string, p: unknown, s: unknown, u: unknown, c: unknown) => Promise<unknown> }) => {
+      capturedExecute = (p, c) =>
+        def.execute("id", p, undefined, (r: { content: Array<{ text: string }> }) => {
+          updates.push(r.content[0]!.text);
+        }, c);
+    },
+  };
+  registerSubagentTool(fakePi as never, { agents: [baseAgent], run: fakeRun } as never);
+  const final = (await capturedExecute!(
+    { agent: "worker", task: "t" },
+    { cwd: process.cwd() },
+  )) as { content: Array<{ text: string }> };
+  const finalContent = final.content[0]!.text;
+  assert.ok(updates.length === 3, `expected 3 live updates, got ${updates.length}`);
+  for (const u of updates) {
+    assert.ok(
+      u.length <= 2048 + 40,
+      `live update capped, got ${u.length} chars`,
+    );
+  }
+  assert.ok(
+    updates.some((u) => u.includes("[…earlier live output omitted…]")),
+    "long run marks the omission",
+  );
+  assert.ok(finalContent.includes("Outcome: done"), "final result keeps the whole outcome");
+  assert.ok(finalContent.includes("transcript line 0"), "final result is NOT capped (archive split happens upstream)");
 });
