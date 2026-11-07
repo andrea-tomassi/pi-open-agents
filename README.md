@@ -334,9 +334,11 @@ Use `replace-all` for fully isolated agents that should not be influenced by
 workspace context — e.g., a subagent that must run identically regardless of
 the project it's invoked from.
 
-For **subagents** (child process), the agent body **is** the system prompt —
-pi's default prompt is not included. Skills are injected as an XML block after
-the body.
+For **subagents** (child process), the same modes apply: with the default
+`append`, the agent body is appended to pi's default prompt (`--append-system-prompt`);
+`replace`/`replace-all` pass the body as the whole system prompt (`--system-prompt`).
+Skills are injected as an XML block after the body, followed by the result-closing
+contract (`## Outcome` block, file + summary).
 
 ---
 
@@ -415,7 +417,8 @@ six sessions, zero chaos: that's the exact workstation setup documented in
 - ~~**Per-call model override** in `subagent()`~~ — ✅ shipped in [0.1.19](https://github.com/andrea-tomassi/pi-open-agents/releases/tag/v0.1.19) (#10)
 - ~~**Primary tool filters incl. extension tools**~~ — ✅ shipped in [0.1.30](https://github.com/andrea-tomassi/pi-open-agents/releases/tag/v0.1.30) (#18)
 - ~~**Subagent output: file + summary**~~ — ✅ shipped in [0.1.31](https://github.com/andrea-tomassi/pi-open-agents/releases/tag/v0.1.31) (#32)
-- **Parallel subagent limit** — #11
+- ~~**Parallel subagent limit**~~ — ✅ closed, see #11 for the outcome
+- **Zero open issues** — the tracker is empty; new work starts from new issues.
 
 ---
 
