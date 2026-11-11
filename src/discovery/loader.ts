@@ -196,8 +196,10 @@ function warnInclude(message: string): void {
  * set of absolute paths on the current expansion path, and nesting is
  * capped at INCLUDE_MAX_DEPTH.
  *
- * Fail-soft: missing files, cycles, and over-deep nesting remove the
- * directive line and warn on stderr, but never throw.
+ * Fail-soft: missing files, cycles, and over-deep nesting keep the directive
+ * line literal and warn on stderr, but never throw. Keeping the line (instead
+ * of dropping it) preserves visibility for debugging and for any downstream
+ * loader that might resolve it later.
  *
  * @param content  Markdown body to process
  * @param baseDir  Directory of the file containing the directives
@@ -238,12 +240,14 @@ async function resolveIncludes(
     const resolved = path.resolve(baseDir, includePath);
 
     if (visited.has(resolved)) {
-      warnInclude(`cycle detected for "${includePath}" (${resolved}); directive dropped`);
+      warnInclude(`cycle detected for "${includePath}" (${resolved}); keeping directive literal`);
+      out.push(line);
       continue;
     }
 
     if (depth >= INCLUDE_MAX_DEPTH) {
-      warnInclude(`max depth ${INCLUDE_MAX_DEPTH} exceeded for "${includePath}"; directive dropped`);
+      warnInclude(`max depth ${INCLUDE_MAX_DEPTH} exceeded for "${includePath}"; keeping directive literal`);
+      out.push(line);
       continue;
     }
 
@@ -253,8 +257,9 @@ async function resolveIncludes(
     } catch {
       if (!ctx.reportedMissing.has(resolved)) {
         ctx.reportedMissing.add(resolved);
-        warnInclude(`file not found: "${includePath}" (${resolved}); directive dropped`);
+        warnInclude(`file not found: "${includePath}" (${resolved}); keeping directive literal`);
       }
+      out.push(line);
       continue;
     }
 

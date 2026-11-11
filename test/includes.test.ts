@@ -137,7 +137,7 @@ include: "b.md"`,
 
 // ─── Cycle & Depth Guards ────────────────────────────────────────────────────
 
-test("include: cycles are detected and dropped, agent still loads", async () => {
+test("include: cycles keep the directive literal, agent still loads", async () => {
   const fs = makeMockFs({
     "/global/a.md": "---\nname: a\nmode: subagent\n---\nA body\ninclude: \"b.md\"",
     // Helper is itself discoverable — disable it so only "a" loads as an agent.
@@ -153,7 +153,7 @@ test("include: cycles are detected and dropped, agent still loads", async () => 
   assert.equal(result.agents[0].name, "a");
   assert.ok(result.agents[0].prompt.includes("A body"));
   assert.ok(result.agents[0].prompt.includes("B body"));
-  assert.ok(!result.agents[0].prompt.includes("include:"), "no directive line may survive");
+  assert.ok(result.agents[0].prompt.includes('include: "a.md"'), "cycle directive stays literal");
   assert.ok(stderr.some((l) => l.includes("cycle")), "cycle warning on stderr");
 });
 
@@ -192,12 +192,12 @@ test("include: nesting is capped at depth 8", async () => {
   const prompt = result.agents.find((a) => a.name === "main")!.prompt;
   assert.ok(prompt.includes("C8"), "depth-8 content should be inlined");
   assert.ok(!prompt.includes("C9"), "beyond depth 8 must not be inlined");
-  assert.ok(!prompt.includes("include:"), "no directive line may survive");
+  assert.ok(prompt.includes('include: "c9.md"'), "over-depth directive stays literal");
 });
 
 // ─── Missing Files (fail-soft) ───────────────────────────────────────────────
 
-test("include: missing file drops the directive, warns once, agent loads", async () => {
+test("include: missing file keeps the directive literal, warns once, agent loads", async () => {
   const fs = makeMockFs({
     "/global/agent.md": `---
 name: agent
@@ -215,7 +215,10 @@ include: "_nope.txt"`,
   });
 
   assert.equal(result.agents.length, 1);
-  assert.equal(result.agents[0].prompt, "Keep me\nKeep me too");
+  assert.equal(
+    result.agents[0].prompt,
+    'Keep me\ninclude: "_nope.txt"\nKeep me too\ninclude: "_nope.txt"',
+  );
   const missingWarnings = stderr.filter((l) => l.includes("_nope.txt"));
   assert.equal(missingWarnings.length, 1, "one warning per missing path");
 });
