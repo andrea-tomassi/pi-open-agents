@@ -376,6 +376,17 @@ export function resolvePiEntryPoint(
   };
 }
 
+/**
+ * Grace period after the child exits before its stdout/stderr are abandoned.
+ *
+ * The child's `close` event only fires once every process holding its stdout or stderr has
+ * gone. A grandchild the child spawned and left behind (an MCP server, an extension host, a
+ * detached local model server) keeps those descriptors open, so `close` can arrive hours after
+ * `exit`, and the caller looks hung until the user interrupts. Output is already collected by
+ * the `data` handlers, so resolving on `exit` after this grace loses nothing but silence.
+ */
+const CLOSE_GRACE_MS = 1500;
+
 export const defaultRunner: ProcessRunner = (invocation, handlers, signal) =>
   new Promise((resolve, reject) => {
     const child = spawn(invocation.command, invocation.args, {
@@ -384,10 +395,33 @@ export const defaultRunner: ProcessRunner = (invocation, handlers, signal) =>
       stdio: ["ignore", "pipe", "pipe"],
     });
 
+    let settled = false;
+    let grace: NodeJS.Timeout | undefined;
+    const settle = (exitCode: number) => {
+      if (settled) return;
+      settled = true;
+      if (grace !== undefined) clearTimeout(grace);
+      resolve({ exitCode });
+    };
+
     child.stdout.on("data", (chunk) => handlers.stdout(String(chunk)));
     child.stderr.on("data", (chunk) => handlers.stderr(String(chunk)));
-    child.on("error", reject);
-    child.on("close", (code) => resolve({ exitCode: code ?? 0 }));
+    child.on("error", (error) => {
+      if (settled) return;
+      settled = true;
+      if (grace !== undefined) clearTimeout(grace);
+      reject(error);
+    });
+    child.on("close", (code) => settle(code ?? 0));
+    child.on("exit", (code) => {
+      // Let the pipe drain for a moment, then stop waiting on descendants that hold it.
+      grace = setTimeout(() => {
+        child.stdout.destroy();
+        child.stderr.destroy();
+        settle(code ?? 0);
+      }, CLOSE_GRACE_MS);
+      grace.unref?.();
+    });
 
     if (signal) {
       const abort = () => child.kill("SIGTERM");
