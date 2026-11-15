@@ -35,7 +35,7 @@
   ],
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "node --test --import tsx test/**/*.test.ts"
+    "test": "node --test --import tsx --import ./test/setup/env-scrub.ts test/**/*.test.ts"
   },
   "pi": {
     "extensions": [
